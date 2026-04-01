@@ -21,7 +21,14 @@ def play(args):
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.push_robots = False
+    env_cfg.domain_rand.push_robots = True
+    env_cfg.domain_rand.push_interval_s=5
+    env_cfg.domain_rand.max_push_vel_xy=1.5
+
+    env_cfg.commands.ranges.lin_vel_x=[-1,1]
+    env_cfg.commands.ranges.lin_vel_y=[-1, 1]
+    env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
+    env_cfg.commands.ranges.heading=[-3.14,2.14]
 
     env_cfg.env.test = True
 
