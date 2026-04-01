@@ -3,8 +3,8 @@ import copy
 import torch
 import numpy as np
 import random
-from isaacgym import gymapi
-from isaacgym import gymutil
+from isaacgym import gymapi # type: ignore
+from isaacgym import gymutil # type: ignore
 
 from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 

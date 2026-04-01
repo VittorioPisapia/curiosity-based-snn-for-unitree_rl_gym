@@ -50,7 +50,7 @@ class RolloutStorage:
         def clear(self):
             self.__init__()
 
-    def __init__(self, num_envs, num_transitions_per_env, obs_shape, privileged_obs_shape, actions_shape, device='cpu'):
+    def __init__(self, num_envs, num_transitions_per_env, obs_shape, privileged_obs_shape, actions_shape, spike_dim, mem_dim, device='cpu'):
 
         self.device = device
 
@@ -66,7 +66,12 @@ class RolloutStorage:
             self.privileged_observations = None
         self.rewards = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
         self.actions = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
-        self.dones = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device).byte()
+        self.dones = torch.zeros(
+                num_transitions_per_env, num_envs, 1,
+                device=self.device,
+                dtype=torch.bool
+            )
+
 
         # For PPO
         self.actions_log_prob = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
@@ -75,7 +80,10 @@ class RolloutStorage:
         self.advantages = torch.zeros(num_transitions_per_env, num_envs, 1, device=self.device)
         self.mu = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
         self.sigma = torch.zeros(num_transitions_per_env, num_envs, *actions_shape, device=self.device)
+        self.snn_m = torch.zeros(num_transitions_per_env, num_envs, mem_dim, device=self.device)
+        self.snn_s = torch.zeros(num_transitions_per_env, num_envs, spike_dim, device=self.device)
 
+        
         self.num_transitions_per_env = num_transitions_per_env
         self.num_envs = num_envs
 
@@ -97,7 +105,12 @@ class RolloutStorage:
         self.actions_log_prob[self.step].copy_(transition.actions_log_prob.view(-1, 1))
         self.mu[self.step].copy_(transition.action_mean)
         self.sigma[self.step].copy_(transition.action_sigma)
-        self._save_hidden_states(transition.hidden_states)
+        if transition.hidden_states is not None:
+            self.snn_m[self.step].copy_(transition.hidden_states["snn_m"])
+            self.snn_s[self.step].copy_(transition.hidden_states["snn_s"])
+
+        #self.hidden_states[self.step].copy(transition.hidden_states)
+        #self._save_hidden_states(transition.hidden_states)
         self.step += 1
 
     def _save_hidden_states(self, hidden_states):
@@ -162,6 +175,9 @@ class RolloutStorage:
         advantages = self.advantages.flatten(0, 1)
         old_mu = self.mu.flatten(0, 1)
         old_sigma = self.sigma.flatten(0, 1)
+        snn_m = self.snn_m.flatten(0,1)
+        snn_s = self.snn_s.flatten(0,1)
+
 
         for epoch in range(num_epochs):
             for i in range(num_mini_batches):
@@ -179,8 +195,15 @@ class RolloutStorage:
                 advantages_batch = advantages[batch_idx]
                 old_mu_batch = old_mu[batch_idx]
                 old_sigma_batch = old_sigma[batch_idx]
+                snn_m_batch = snn_m[batch_idx]
+                snn_s_batch = snn_s[batch_idx]
+                hidden_states_batch = {
+                    "snn_m": snn_m_batch,
+                    "snn_s": snn_s_batch
+                }
+
                 yield obs_batch, critic_observations_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, \
-                       old_actions_log_prob_batch, old_mu_batch, old_sigma_batch, (None, None), None
+                    old_actions_log_prob_batch, old_mu_batch, old_sigma_batch, hidden_states_batch, None
 
     # for RNNs only
     def reccurent_mini_batch_generator(self, num_mini_batches, num_epochs=8):

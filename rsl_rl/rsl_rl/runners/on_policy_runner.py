@@ -37,8 +37,9 @@ from torch.utils.tensorboard import SummaryWriter
 import torch
 
 from rsl_rl.algorithms import PPO
-from rsl_rl.modules import ActorCritic, ActorCriticRecurrent
+from rsl_rl.modules import ActorCritic
 from rsl_rl.env import VecEnv
+#from rsl_rl.modules import icm, ICM
 
 
 class OnPolicyRunner:
@@ -86,6 +87,7 @@ class OnPolicyRunner:
             self.writer = SummaryWriter(log_dir=self.log_dir, flush_secs=10)
         if init_at_random_ep_len:
             self.env.episode_length_buf = torch.randint_like(self.env.episode_length_buf, high=int(self.env.max_episode_length))
+        self.alg.actor_critic.hidden_states = None
         obs = self.env.get_observations()
         privileged_obs = self.env.get_privileged_observations()
         critic_obs = privileged_obs if privileged_obs is not None else obs
@@ -162,14 +164,23 @@ class OnPolicyRunner:
                 ep_string += f"""{f'Mean episode {key}:':>{pad}} {value:.4f}\n"""
         mean_std = self.alg.actor_critic.std.mean()
         fps = int(self.num_steps_per_env * self.env.num_envs / (locs['collection_time'] + locs['learn_time']))
+        actor = self.alg.actor_critic.actor
+        s1_rate = getattr(actor, "last_s1_rate", float("nan"))
+        s2_rate = getattr(actor, "last_s2_rate", float("nan"))
+        m1_mean = getattr(actor, "last_m1_mean", float("nan"))
+        m2_mean = getattr(actor, "last_m2_mean", float("nan"))
+        decay_mean = getattr(actor, "last_decay_mean", float("nan"))
 
         self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
         self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
-        self.writer.add_scalar('Perf/total_fps', fps, locs['it'])
-        self.writer.add_scalar('Perf/collection time', locs['collection_time'], locs['it'])
-        self.writer.add_scalar('Perf/learning_time', locs['learn_time'], locs['it'])
+
+        self.writer.add_scalar('SNN/s1_spike_rate', self.alg.actor_critic.actor.last_s1_rate, locs['it'])
+        self.writer.add_scalar('SNN/s2_spike_rate', self.alg.actor_critic.actor.last_s2_rate, locs['it'])
+        self.writer.add_scalar('SNN/m1_mean', self.alg.actor_critic.actor.last_m1_mean, locs['it'])
+        self.writer.add_scalar('SNN/m2_mean', self.alg.actor_critic.actor.last_m2_mean, locs['it'])
+        self.writer.add_scalar('SNN/decay_mean', self.alg.actor_critic.actor.last_decay_mean, locs['it'])
         if len(locs['rewbuffer']) > 0:
             self.writer.add_scalar('Train/mean_reward', statistics.mean(locs['rewbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
@@ -180,16 +191,18 @@ class OnPolicyRunner:
 
         if len(locs['rewbuffer']) > 0:
             log_string = (f"""{'#' * width}\n"""
-                          f"""{str.center(width, ' ')}\n\n"""
-                          f"""{'Computation:':>{pad}} {fps:.0f} steps/s (collection: {locs[
-                            'collection_time']:.3f}s, learning {locs['learn_time']:.3f}s)\n"""
-                          f"""{'Value function loss:':>{pad}} {locs['mean_value_loss']:.4f}\n"""
-                          f"""{'Surrogate loss:':>{pad}} {locs['mean_surrogate_loss']:.4f}\n"""
-                          f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
-                          f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
-                          f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n""")
-                        #   f"""{'Mean reward/step:':>{pad}} {locs['mean_reward']:.2f}\n"""
-                        #   f"""{'Mean episode length/episode:':>{pad}} {locs['mean_trajectory_length']:.2f}\n""")
+              f"""{str.center(width, ' ')}\n\n"""
+              f"""{'Computation:':>{pad}} {fps:.0f} steps/s (collection: {locs['collection_time']:.3f}s, learning {locs['learn_time']:.3f}s)\n"""
+              f"""{'Value function loss:':>{pad}} {locs['mean_value_loss']:.4f}\n"""
+              f"""{'Surrogate loss:':>{pad}} {locs['mean_surrogate_loss']:.4f}\n"""
+              f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
+              f"""{'SNN s1 spike rate:':>{pad}} {s1_rate:.4f}\n"""
+              f"""{'SNN s2 spike rate:':>{pad}} {s2_rate:.4f}\n"""
+              f"""{'SNN m1 mean:':>{pad}} {m1_mean:.4f}\n"""
+              f"""{'SNN m2 mean:':>{pad}} {m2_mean:.4f}\n"""
+              f"""{'SNN decay mean:':>{pad}} {decay_mean:.4f}\n"""
+              f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
+              f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n""")
         else:
             log_string = (f"""{'#' * width}\n"""
                           f"""{str.center(width, ' ')}\n\n"""

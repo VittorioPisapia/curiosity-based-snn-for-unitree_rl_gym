@@ -79,7 +79,16 @@ class PPO:
         self.use_clipped_value_loss = use_clipped_value_loss
 
     def init_storage(self, num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape):
-        self.storage = RolloutStorage(num_envs, num_transitions_per_env, actor_obs_shape, critic_obs_shape, action_shape, self.device)
+        self.storage = RolloutStorage(
+            num_envs,
+            num_transitions_per_env,
+            actor_obs_shape,
+            critic_obs_shape,
+            action_shape,
+            spike_dim=self.actor_critic.actor.spike_dim,
+            mem_dim=self.actor_critic.actor.mem_dim,
+            device=self.device
+        )
 
     def test_mode(self):
         self.actor_critic.test()
@@ -88,17 +97,24 @@ class PPO:
         self.actor_critic.train()
 
     def act(self, obs, critic_obs):
-        if self.actor_critic.is_recurrent:
-            self.transition.hidden_states = self.actor_critic.get_hidden_states()
-        # Compute the actions and values
+        prev_hidden_states = None
+        if self.actor_critic.hidden_states is not None:
+            prev_hidden_states = {
+                "snn_m": self.actor_critic.hidden_states["snn_m"].detach().clone(),
+                "snn_s": self.actor_critic.hidden_states["snn_s"].detach().clone(),
+            }
+
         self.transition.actions = self.actor_critic.act(obs).detach()
         self.transition.values = self.actor_critic.evaluate(critic_obs).detach()
         self.transition.actions_log_prob = self.actor_critic.get_actions_log_prob(self.transition.actions).detach()
+
         self.transition.action_mean = self.actor_critic.action_mean.detach()
         self.transition.action_sigma = self.actor_critic.action_std.detach()
-        # need to record obs and critic_obs before env.step()
+
         self.transition.observations = obs
         self.transition.critic_observations = critic_obs
+        self.transition.hidden_states = prev_hidden_states
+
         return self.transition.actions
     
     def process_env_step(self, rewards, dones, infos):
@@ -128,9 +144,9 @@ class PPO:
             old_mu_batch, old_sigma_batch, hid_states_batch, masks_batch in generator:
 
 
-                self.actor_critic.act(obs_batch, masks=masks_batch, hidden_states=hid_states_batch[0])
+                self.actor_critic.update_distribution(obs_batch, hidden_states=hid_states_batch)
                 actions_log_prob_batch = self.actor_critic.get_actions_log_prob(actions_batch)
-                value_batch = self.actor_critic.evaluate(critic_obs_batch, masks=masks_batch, hidden_states=hid_states_batch[1])
+                value_batch = self.actor_critic.evaluate(critic_obs_batch)
                 mu_batch = self.actor_critic.action_mean
                 sigma_batch = self.actor_critic.action_std
                 entropy_batch = self.actor_critic.entropy
