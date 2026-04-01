@@ -57,7 +57,7 @@ class OnPolicyRunner:
         self.env = env
         self.eta = 0.005
         self.beta = 0.2
-        self.intrinsic_coeff = 0.001
+        self.intrinsic_coeff = 0.01
         self.running_std = torch.tensor(1.0, device=self.device)
 
         self.icm_obs = []
