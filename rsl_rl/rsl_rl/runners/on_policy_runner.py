@@ -39,7 +39,7 @@ import torch
 from rsl_rl.algorithms import PPO
 from rsl_rl.modules import ActorCritic
 from rsl_rl.env import VecEnv
-#from rsl_rl.modules import icm, ICM
+from rsl_rl.modules.icm import ICM
 
 
 class OnPolicyRunner:
@@ -55,6 +55,15 @@ class OnPolicyRunner:
         self.policy_cfg = train_cfg["policy"]
         self.device = device
         self.env = env
+        self.eta = 0.005
+        self.beta = 0.2
+        self.intrinsic_coeff = 0.001
+        self.running_std = torch.tensor(1.0, device=self.device)
+
+        self.icm_obs = []
+        self.icm_next_obs = []
+        self.icm_actions = []
+
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
         else:
@@ -68,6 +77,8 @@ class OnPolicyRunner:
         self.alg: PPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
+        self.icm = ICM(env.num_obs, env.num_actions, hidden_dimension=128, activation="relu").to(self.device)
+        self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-3)
 
         # init storage and model
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])
@@ -100,29 +111,73 @@ class OnPolicyRunner:
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
+
         tot_iter = self.current_learning_iteration + num_learning_iterations
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
+            extrinsic_sum = 0.0
+            intrinsic_sum = 0.0
+            count = 0
             # Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
+                    prev_obs = obs.clone()
                     actions = self.alg.act(obs, critic_obs)
+                    prev_action = actions
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
                     critic_obs = privileged_obs if privileged_obs is not None else obs
+
+                    prev_obs = prev_obs.to(self.device)
+                    prev_action = prev_action.to(self.device)
+                    obs = obs.to(self.device)
+
+                    # Compute encoded states
+                    encoded_prev = self.icm.compute_encoded(prev_obs)
+                    encoded_next = self.icm.compute_encoded(obs)
+
+                    # Compute Forward model
+                    forward_value = self.icm.compute_forward(encoded_prev, prev_action)
+
+                    # Compute Intrinsic reward
+                    intrinsic_reward = self.eta * ((encoded_next - forward_value) ** 2).mean(dim=-1, keepdim=True)
+
+                    current_std = intrinsic_reward.std().item()
+                    self.running_std = 0.99 * self.running_std + 0.01 * current_std
+
+                    intrinsic_reward = intrinsic_reward / (self.running_std + 1e-8)
+                    intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, 0.2)
+
+                    intrinsic_reward = intrinsic_reward.detach()
+                    intrinsic_reward = intrinsic_reward.squeeze(-1)
+
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
-                    self.alg.process_env_step(rewards, dones, infos)
+
+                    #print("Extrinsic rewards: ", rewards[0:10].tolist())
+                    #print("Intrinsic rewards: ", intrinsic_reward[0].tolist())
+
+                    total_reward = rewards + self.intrinsic_coeff *intrinsic_reward
+                    self.alg.process_env_step(total_reward, dones, infos)
+
+                    self.icm_obs.append(prev_obs.detach())
+                    self.icm_next_obs.append(obs.detach())
+                    self.icm_actions.append(actions.detach())
+
+                    extrinsic_sum += rewards.mean().item()
+                    intrinsic_sum += intrinsic_reward.mean().item()
+                    count += 1
                     
                     if self.log_dir is not None:
                         # Book keeping
                         if 'episode' in infos:
                             ep_infos.append(infos['episode'])
-                        cur_reward_sum += rewards
+                        cur_reward_sum += total_reward
                         cur_episode_length += 1
                         new_ids = (dones > 0).nonzero(as_tuple=False)
                         rewbuffer.extend(cur_reward_sum[new_ids][:, 0].cpu().numpy().tolist())
                         lenbuffer.extend(cur_episode_length[new_ids][:, 0].cpu().numpy().tolist())
                         cur_reward_sum[new_ids] = 0
                         cur_episode_length[new_ids] = 0
+
 
                 stop = time.time()
                 collection_time = stop - start
@@ -132,6 +187,33 @@ class OnPolicyRunner:
                 self.alg.compute_returns(critic_obs)
             
             mean_value_loss, mean_surrogate_loss = self.alg.update()
+
+            obs_batch = torch.cat(self.icm_obs, dim=0)
+            next_obs_batch = torch.cat(self.icm_next_obs, dim=0)
+            actions_batch = torch.cat(self.icm_actions, dim=0)
+
+            encoded_obs_batch = self.icm.compute_encoded(obs_batch)
+            encoded_next_obs_batch = self.icm.compute_encoded(next_obs_batch)
+            
+            pred_next = self.icm.compute_forward(encoded_obs_batch, actions_batch)
+            forward_loss = ((pred_next - encoded_next_obs_batch)**2).mean()
+
+            pred_action = self.icm.compute_inverse(encoded_obs_batch, encoded_next_obs_batch)
+            inverse_loss = ((pred_action - actions_batch)**2).mean()
+
+            icm_loss = forward_loss + self.beta * inverse_loss
+
+            self.icm_optimizer.zero_grad()
+            icm_loss.backward()
+            self.icm_optimizer.step()
+            if self.log_dir is not None:
+                self.writer.add_scalar("Reward/extrinsic", extrinsic_sum / count, it)
+                self.writer.add_scalar("Reward/intrinsic", intrinsic_sum / count, it)
+                self.writer.add_scalar(
+                                "Reward/intrinsic_scaled",
+                                self.intrinsic_coeff * (intrinsic_sum / count),
+                                it
+                            )
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:
@@ -139,6 +221,9 @@ class OnPolicyRunner:
             if it % self.save_interval == 0:
                 self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
             ep_infos.clear()
+            self.icm_obs.clear()
+            self.icm_next_obs.clear()
+            self.icm_actions.clear()
         
         self.current_learning_iteration += num_learning_iterations
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
