@@ -28,7 +28,7 @@ def play(args):
     env_cfg.commands.ranges.lin_vel_x=[-1,1]
     env_cfg.commands.ranges.lin_vel_y=[-1, 1]
     env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
-    env_cfg.commands.ranges.heading=[-3.14,2.14]
+    env_cfg.commands.ranges.heading=[-3.14,3.14]
 
     env_cfg.env.test = True
 
