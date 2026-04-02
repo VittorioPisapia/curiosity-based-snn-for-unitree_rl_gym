@@ -4,7 +4,7 @@ import os
 import sys
 from legged_gym import LEGGED_GYM_ROOT_DIR
 
-import isaacgym
+import isaacgym # type: ignore
 from legged_gym.envs import *
 from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger
 
