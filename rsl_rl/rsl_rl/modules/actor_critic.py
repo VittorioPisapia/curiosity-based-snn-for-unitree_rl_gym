@@ -204,7 +204,6 @@ class ActorCritic(nn.Module):
     def __init__(self,  num_actor_obs,
                         num_critic_obs,
                         num_actions,
-                        actor_hidden_dims=[256, 256, 256],
                         critic_hidden_dims=[256, 256, 256],
                         activation='elu',
                         init_noise_std=1.0,
