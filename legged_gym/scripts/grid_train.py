@@ -11,7 +11,7 @@ from legged_gym.utils.task_registry import LEGGED_GYM_ROOT_DIR
 import torch
 
 lens_search = [0.1, 0.3, 0.5]
-threshold_search = [0.1, 0.3, 0.5]
+threshold_search = [0.3, 0.5, 0.7]
 st_search = [1, 2, 3]
 results = {}
 
