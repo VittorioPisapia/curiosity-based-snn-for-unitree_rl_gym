@@ -1,9 +1,16 @@
 <div align="center">
-  <h1 align="center">Unitree RL GYM</h1>
+  <h1 align="center">Unitree RL GYM (SNN & ICM Fork)</h1>
   <p align="center">
     <span> 🌎English </span> | <a href="README_zh.md"> 🇨🇳中文 </a>
   </p>
 </div>
+
+> **⚠️ WORK IN PROGRESS FORK ⚠️**
+>
+> This repository is a fork of the original Unitree RL GYM. It is currently a **Work In Progress (WIP)** and introduces an implementation of **Spiking Neural Networks (SNN)** and the **Intrinsic Curiosity Module (ICM)**.
+In order to see the implementations, switch between the different branches.
+>
+> *Note: The Chinese translation (`README_zh.md`) is currently out of date and does not reflect these new modifications.*
 
 <p align="center">
   <strong>This is a repository for reinforcement learning implementation based on Unitree robots, supporting Unitree Go2, H1, H1_2, and G1.</strong> 
@@ -16,6 +23,8 @@
 | [<img src="https://oss-global-cdn.unitree.com/static/32f06dc9dfe4452dac300dda45e86b34.GIF" width="240px">](https://oss-global-cdn.unitree.com/static/5bbc5ab1d551407080ca9d58d7bec1c8.mp4) | [<img src="https://oss-global-cdn.unitree.com/static/244cd5c4f823495fbfb67ef08f56aa33.GIF" width="240px">](https://oss-global-cdn.unitree.com/static/5aa48535ffd641e2932c0ba45c8e7854.mp4) | [<img src="https://oss-global-cdn.unitree.com/static/78c61459d3ab41448cfdb31f6a537e8b.GIF" width="240px">](https://oss-global-cdn.unitree.com/static/0818dcf7a6874b92997354d628adcacd.mp4) |
 
 </div>
+
+---
 
 ---
 
