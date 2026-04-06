@@ -1,9 +1,16 @@
 <div align="center">
-  <h1 align="center">Unitree RL GYM</h1>
+  <h1 align="center">Unitree RL GYM (SNN & ICM Fork)</h1>
   <p align="center">
     <span> 🌎English </span> | <a href="README_zh.md"> 🇨🇳中文 </a>
   </p>
 </div>
+
+> **⚠️ WORK IN PROGRESS FORK ⚠️**
+>
+> This repository is a fork of the original Unitree RL GYM. It is currently a **Work In Progress (WIP)** and introduces an implementation of **Spiking Neural Networks (SNN)** and the **Intrinsic Curiosity Module (ICM)**.
+In order to see the implementations, switch between the different branches.
+>
+> *Note: The Chinese translation (`README_zh.md`) is currently out of date and does not reflect these new modifications.*
 
 <p align="center">
   <strong>This is a repository for reinforcement learning implementation based on Unitree robots, supporting Unitree Go2, H1, H1_2, and G1.</strong> 
