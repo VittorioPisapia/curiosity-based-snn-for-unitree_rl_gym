@@ -8,6 +8,7 @@
 > **⚠️ WORK IN PROGRESS FORK ⚠️**
 >
 > This repository is a fork of the original Unitree RL GYM. It is currently a **Work In Progress (WIP)** and introduces an implementation of **Spiking Neural Networks (SNN)** and the **Intrinsic Curiosity Module (ICM)**.
+In order to see the implementations, switch between the different branches.
 >
 > *Note: The Chinese translation (`README_zh.md`) is currently out of date and does not reflect these new modifications.*
 
