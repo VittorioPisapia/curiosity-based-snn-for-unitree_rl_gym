@@ -27,8 +27,8 @@ class LeggedRobotCfg(BaseConfig):
         selected = False # select a unique terrain type and pass all arguments
         terrain_kwargs = None # Dict of arguments for selected terrain
         max_init_terrain_level = 5 # starting curriculum state
-        terrain_length = 2.
-        terrain_width = 2.
+        terrain_length = 4.
+        terrain_width = 4.
         num_rows= 10 # number of terrain rows (levels)
         num_cols = 20 # number of terrain cols (types)
         # terrain types: [smooth slope, rough slope, stairs up, stairs down, discrete]
