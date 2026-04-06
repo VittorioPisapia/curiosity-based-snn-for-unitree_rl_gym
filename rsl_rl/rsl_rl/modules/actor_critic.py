@@ -114,7 +114,7 @@ class LIFGaussian(Neurons):
         return output
 
 class SNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, device):
+    def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.3, lens=0.3):
         super().__init__()
 
         self.device = torch.device(device) if isinstance(device, str) else device
@@ -124,13 +124,13 @@ class SNN(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, output_dim)
 
-        self.fs = LIFGaussian(lens=0.3, device=self.device)
+        self.fs = LIFGaussian(lens=lens, device=self.device)
 
         self.spike_dim = 2 * hidden_dim
         self.mem_dim = 2 * hidden_dim
 
         self.thresholds = nn.Parameter(
-            torch.full((self.spike_dim,), 0.3, device=self.device)
+            torch.full((self.spike_dim,), threshold_init, device=self.device) 
         )
         self.decays_raw = nn.Parameter(
             torch.full((self.mem_dim,), -0.5, device=self.device)
@@ -179,7 +179,7 @@ class SNN(nn.Module):
             }
 
         for _ in range(st):
-            z1 = self.fc1(obs*1.5)
+            z1 = self.fc1(obs*1.5) #TODO change the scaling factor
             h1 = self._neurons_forward(z1, current_state, 0, self.hidden_dim, True)
 
             z2 = self.fc2(h1["snn_s"])
@@ -218,7 +218,8 @@ class ActorCritic(nn.Module):
         mlp_input_dim_a = num_actor_obs
         mlp_input_dim_c = num_critic_obs
 
-        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda")
+        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda", threshold_init=kwargs.get('snn_threshold', 0.3), lens=kwargs.get('snn_lens', 0.3))
+        self.st = kwargs.get('snn_st', 1)
 
        # Value function
         critic_layers = []
@@ -280,11 +281,11 @@ class ActorCritic(nn.Module):
         return self.distribution.entropy().sum(dim=-1)
 
     def update_distribution(self, observations, hidden_states=None):
-        mean, _ = self.actor(observations, hidden_states=hidden_states)
+        mean, _ = self.actor(observations, hidden_states=hidden_states, st=self.st)
         self.distribution = Normal(mean, self.std.expand_as(mean))
 
     def act(self, observations, **kwargs):
-        mean, next_hidden_states = self.actor(observations, hidden_states=self.hidden_states)
+        mean, next_hidden_states = self.actor(observations, hidden_states=self.hidden_states, st=self.st)
         self.distribution = Normal(mean, self.std.expand_as(mean))
 
         self.hidden_states = {
