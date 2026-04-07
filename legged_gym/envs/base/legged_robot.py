@@ -773,6 +773,14 @@ class LeggedRobot(BaseTask):
         return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
 
     def _reward_cost_of_transport(self):
-        # penalize high CoT 
-        # TODO not implemented
-        return
+        # Penalize high cost of transport (energy per distance traveled)
+        # CoT = mechanical work / (body weight * distance traveled)
+        # Approximated as: torque * velocity / (mass * velocity)
+        
+        mechanical_work = torch.sum(torch.abs(self.torques * self.dof_vel), dim=1)      
+        horizontal_vel = torch.norm(self.base_lin_vel[:, :2], dim=1)
+        horizontal_vel = torch.clamp(horizontal_vel, min=0.01)
+        cot = mechanical_work / horizontal_vel
+        
+        # Return negative reward (penalize high CoT)
+        return -cot
