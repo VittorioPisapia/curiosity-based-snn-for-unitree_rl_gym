@@ -180,9 +180,9 @@ class LeggedRobotCfgPPO(BaseConfig):
         activation = 'elu' # can be elu, relu, selu, crelu, lrelu, tanh, sigmoid
 
         # SNN parameters
-        snn_threshold = 0.3
+        snn_threshold = 0.5
         snn_lens = 0.3
-        snn_st = 1
+        snn_st = 2
         
         # only for 'ActorCriticRecurrent':
         # rnn_type = 'lstm'
