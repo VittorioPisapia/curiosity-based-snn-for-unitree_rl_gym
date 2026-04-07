@@ -10,17 +10,19 @@ from legged_gym.utils import get_args, task_registry
 from legged_gym.utils.task_registry import LEGGED_GYM_ROOT_DIR
 import torch
 
-lens_search = [0.1, 0.3, 0.5]
-threshold_search = [0.3, 0.5, 0.7]
-st_search = [1, 2, 3]
+lens_search = [0.5]
+threshold_search = [0.7]
+st_search = [2]
+feet_air_time_search = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 results = {}
 
-def train(args, lens, threshold, st, log_root):
+def train(args, lens, threshold, st, feet_air_time, log_root):
     env, env_cfg = task_registry.make_env(name=args.task, args=args)
     _, train_cfg = task_registry.get_cfgs(args.task)
     train_cfg.policy.snn_lens = lens
     train_cfg.policy.snn_threshold = threshold
     train_cfg.policy.snn_st = st
+    train_cfg.rewards.scales.feet_air_time = feet_air_time
     ppo_runner, _ = task_registry.make_alg_runner(env=env, train_cfg=train_cfg, args=args, log_root=log_root)
     ppo_runner.learn(num_learning_iterations=train_cfg.runner.max_iterations, init_at_random_ep_len=True)
     _, average_episode_reward = ppo_runner.alg.storage.get_statistics()
@@ -35,9 +37,10 @@ if __name__ == '__main__':
     for lens in lens_search:
         for threshold in threshold_search:
             for st in st_search:
-                print(f"Running with lens={lens}, threshold={threshold}, st={st}")
-                log_dir, avg_reward = train(args, lens, threshold, st, grid_log_root)
-                results[f"lens_{lens}_threshold_{threshold}_st_{st}"] = {"log_dir": log_dir, "avg_reward": avg_reward}
+                for feet_air_time in feet_air_time_search:
+                    print(f"Running with lens={lens}, threshold={threshold}, st={st}, feet_air_time={feet_air_time}")
+                    log_dir, avg_reward = train(args, lens, threshold, st, feet_air_time, grid_log_root)
+                    results[f"lens_{lens}_threshold_{threshold}_st_{st}_feet_air_time_{feet_air_time}"] = {"log_dir": log_dir, "avg_reward": avg_reward}
    
     with open(os.path.join(grid_log_root, 'grid_search_results.json'), 'w') as f:
         json.dump(results, f, indent=4)
