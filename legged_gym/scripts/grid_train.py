@@ -13,8 +13,8 @@ import torch
 lens_search = [0.5]
 threshold_search = [0.7]
 st_search = [2]
-feet_air_time_search = [0.5, 1.0, 1.5, 2.0]
-base_height_search = [0.0, -5, -10, -15]
+feet_air_time_search = [1.0, 1.5, 2.0]
+base_height_search = [-5, -10, -15]
 results = {}
 
 def train(args, lens, threshold, st, feet_air_time, base_height, log_root):
