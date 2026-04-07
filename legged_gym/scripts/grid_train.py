@@ -17,12 +17,12 @@ feet_air_time_search = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
 results = {}
 
 def train(args, lens, threshold, st, feet_air_time, log_root):
-    env, env_cfg = task_registry.make_env(name=args.task, args=args)
-    _, train_cfg = task_registry.get_cfgs(args.task)
+    env_cfg, train_cfg = task_registry.get_cfgs(args.task)
+    env_cfg.rewards.scales.feet_air_time = feet_air_time
+    env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     train_cfg.policy.snn_lens = lens
     train_cfg.policy.snn_threshold = threshold
     train_cfg.policy.snn_st = st
-    train_cfg.rewards.scales.feet_air_time = feet_air_time
     ppo_runner, _ = task_registry.make_alg_runner(env=env, train_cfg=train_cfg, args=args, log_root=log_root)
     ppo_runner.learn(num_learning_iterations=train_cfg.runner.max_iterations, init_at_random_ep_len=True)
     _, average_episode_reward = ppo_runner.alg.storage.get_statistics()
