@@ -171,7 +171,7 @@ class SNN(nn.Module):
             output_spikes
         )
 
-    def forward(self, obs, hidden_states, st=1):
+    def forward(self, obs, hidden_states, st=2):
         obs = obs.to(self.device)
         batch_size = obs.shape[0]
         st = int(st)
