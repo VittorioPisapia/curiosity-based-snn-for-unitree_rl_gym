@@ -14,11 +14,13 @@ lens_search = [0.5]
 threshold_search = [0.7]
 st_search = [2]
 feet_air_time_search = [0.5, 1.0, 1.5, 2.0, 2.5, 3.0]
+feet_stamble = [0.5, 1.0, 1.5, 2.0]
 results = {}
 
-def train(args, lens, threshold, st, feet_air_time, log_root):
+def train(args, lens, threshold, st, feet_air_time, feet_stumble, log_root):
     env_cfg, train_cfg = task_registry.get_cfgs(args.task)
     env_cfg.rewards.scales.feet_air_time = feet_air_time
+    env_cfg.rewards.scales.feet_stumble = feet_stumble
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     train_cfg.policy.snn_lens = lens
     train_cfg.policy.snn_threshold = threshold
@@ -38,10 +40,11 @@ if __name__ == '__main__':
         for threshold in threshold_search:
             for st in st_search:
                 for feet_air_time in feet_air_time_search:
-                    print(f"Running with lens={lens}, threshold={threshold}, st={st}, feet_air_time={feet_air_time}")
-                    log_dir, avg_reward = train(args, lens, threshold, st, feet_air_time, grid_log_root)
-                    results[f"lens_{lens}_threshold_{threshold}_st_{st}_feet_air_time_{feet_air_time}"] = {"log_dir": log_dir, "avg_reward": avg_reward}
-   
+                    for feet_stumble in feet_stamble:
+                        print(f"Running with lens={lens}, threshold={threshold}, st={st}, feet_air_time={feet_air_time}, feet_stumble={feet_stumble}")
+                        log_dir, avg_reward = train(args, lens, threshold, st, feet_air_time, feet_stumble, grid_log_root)
+                        results[f"lens_{lens}_threshold_{threshold}_st_{st}_feet_air_time_{feet_air_time}_feet_stumble_{feet_stumble}"] = {"log_dir": log_dir, "avg_reward": avg_reward}
+
     with open(os.path.join(grid_log_root, 'grid_search_results.json'), 'w') as f:
         json.dump(results, f, indent=4)
     print(f"Grid search completed. Logs saved in {grid_log_root}")
