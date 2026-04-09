@@ -6,7 +6,7 @@ from datetime import datetime
 
 
 import isaacgym # type: ignore
-from isaacgym import gymapi # Required for camera setup
+from isaacgym import gymapi 
 from legged_gym.envs import *
 from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path
 
@@ -16,6 +16,7 @@ import torch
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
+
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     env_cfg.terrain.mesh_type = 'plane'
@@ -105,8 +106,7 @@ def play(args):
 
     if args.record:
         video_writer.close()
-        print("Saved video successfully to headless_eval.mp4!")
-
+        print("Saved video successfully")
 
 if __name__ == '__main__':
     EXPORT_POLICY = True
