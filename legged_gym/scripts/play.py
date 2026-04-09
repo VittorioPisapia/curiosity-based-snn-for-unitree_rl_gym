@@ -16,6 +16,7 @@ def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
+    env_cfg.terrain.mesh_type = 'trimesh'
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = False
@@ -75,6 +76,18 @@ def play(args):
         obs, _, rews, dones, infos = env.step(actions.detach())
 
         if args.record:
+            robot_pos = env.root_states[0, :3].cpu().numpy()
+            env_origin = env.gym.get_env_origin(env.envs[0])
+            local_x = robot_pos[0] - env_origin.x
+            local_y = robot_pos[1] - env_origin.y
+            local_z = robot_pos[2] - env_origin.z
+            
+            cam_pos = gymapi.Vec3(local_x + 2.0, local_y + 2.0, local_z + 1.0)
+            cam_target = gymapi.Vec3(local_x, local_y, local_z)
+            env.gym.set_camera_location(camera_handle, env.envs[0], cam_pos, cam_target)
+            
+            env.gym.fetch_results(env.sim, True)
+
             env.gym.step_graphics(env.sim)
             env.gym.render_all_camera_sensors(env.sim)
             
