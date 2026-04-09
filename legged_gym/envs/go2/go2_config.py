@@ -46,6 +46,7 @@ class GO2RoughCfg( LeggedRobotCfg ):
             dof_pos_limits = -10.0
             base_height = -15.0
             feet_air_time = 1.5
+            action_rate = -0.05
 
 class GO2RoughCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):

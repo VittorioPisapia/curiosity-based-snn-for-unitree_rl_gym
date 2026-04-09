@@ -188,7 +188,7 @@ class SNN(nn.Module):
             }
 
         for _ in range(st):
-            z1 = self.fc1(obs*1.5) #TODO change the scaling factor
+            z1 = self.fc1(obs*1.5) 
             h1 = self._neurons_forward(z1, current_state, 0, self.hidden_dim, True)
 
             z2 = self.fc2(h1["snn_s"])
