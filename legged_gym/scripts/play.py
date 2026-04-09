@@ -2,11 +2,13 @@ import sys
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import imageio
 import os
+from datetime import datetime
+
 
 import isaacgym # type: ignore
 from isaacgym import gymapi # Required for camera setup
 from legged_gym.envs import *
-from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger
+from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path
 
 import numpy as np
 import torch
@@ -16,13 +18,13 @@ def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
-    env_cfg.terrain.mesh_type = 'trimesh'
+    env_cfg.terrain.mesh_type = 'plane'
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.push_robots = True
+    env_cfg.domain_rand.push_robots = False
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1.5
 
@@ -51,12 +53,16 @@ def play(args):
         print('Exported policy as jit script to: ', path)
 
     if args.record:
-        experiment_dir = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)
+
+        experiment_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)     
+        model_path = get_load_path(root=experiment_root, 
+                                   load_run=args.load_run, 
+                                   checkpoint=args.checkpoint)
+        experiment_dir = os.path.dirname(model_path)
         video_dir = os.path.join(experiment_dir, 'videos')
-        
         os.makedirs(video_dir, exist_ok=True)
-        
-        video_path = os.path.join(video_dir, f"headless_eval.mp4")
+        timestamp = datetime.now().strftime('%b%d_%H-%M-%S')
+        video_path = os.path.join(video_dir, f"{timestamp}_headless_eval.mp4")
 
         camera_props = gymapi.CameraProperties()
         camera_props.width = 1280
@@ -68,7 +74,7 @@ def play(args):
         env.gym.set_camera_location(camera_handle, env.envs[0], camera_position, camera_target)
         
         video_writer = imageio.get_writer(video_path, fps=50)
-        print(f"Starting headless video recording...")
+        print("Starting headless video recording...")
         print(f"Video will be saved to: {video_path}")
 
     for i in range(10*int(env.max_episode_length)):
