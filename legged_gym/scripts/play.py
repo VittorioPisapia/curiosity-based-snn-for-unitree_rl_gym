@@ -32,6 +32,9 @@ def play(args):
 
     env_cfg.env.test = True
 
+    if hasattr(env_cfg.env, "enable_camera_sensors"):
+        env_cfg.env.enable_camera_sensors = True
+
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     obs = env.get_observations()
@@ -59,7 +62,7 @@ def play(args):
         camera_props.height = 720
         camera_handle = env.gym.create_camera_sensor(env.envs[0], camera_props)
         
-        camera_position = gymapi.Vec3(2.0, 2.0, 1.0)
+        camera_position = gymapi.Vec3(4.0, 4.0, 3.0)
         camera_target = gymapi.Vec3(0.0, 0.0, 0.5)
         env.gym.set_camera_location(camera_handle, env.envs[0], camera_position, camera_target)
         
