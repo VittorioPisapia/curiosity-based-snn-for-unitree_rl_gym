@@ -819,10 +819,9 @@ class LeggedRobot(BaseTask):
         return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
 
     def _reward_cost_of_transport(self):
-        # Penalize high cost of transport (energy per distance traveled)
+        # Penalize high cost of transport (energy per distance traveled)   TODO testing needed
         # CoT = mechanical work / (body weight * distance traveled)
         # Approximated as: torque * velocity / (mass * velocity)
-        
         mechanical_work = torch.sum(torch.abs(self.torques * self.dof_vel), dim=1)      
         horizontal_vel = torch.norm(self.base_lin_vel[:, :2], dim=1)
         horizontal_vel = torch.clamp(horizontal_vel, min=0.01)
@@ -831,7 +830,7 @@ class LeggedRobot(BaseTask):
         return cot
     
     def _reward_slip(self):
-        # Penalize foot slip: high horizontal foot velocity while in contact with the ground
+        # Penalize foot slip: high horizontal foot velocity while in contact with the ground   TODO need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
         foot_velocities = self.rigid_body_states[:, self.feet_indices, 7:10]
         foot_velocities_xy = torch.norm(foot_velocities[:, :, :2], dim=2)
         contact = self.contact_forces[:, self.feet_indices, 2] > 1.0
