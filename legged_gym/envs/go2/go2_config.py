@@ -44,17 +44,11 @@ class GO2RoughCfg( LeggedRobotCfg ):
         class scales( LeggedRobotCfg.rewards.scales ):
             torques = -0.0002
             dof_pos_limits = -10.0
-<<<<<<< HEAD
-            base_height = -10 
-            feet_air_time = 1.5
-            action_rate = -0.02
-            slip = -0.1    
-=======
+
             base_height = -15 #TODO now seems too low
             feet_air_time = 1.5
             action_rate = -0.02
             slip = 0.0
->>>>>>> cc8450496a059ab57ed29f521746ee2203259f6c
 
 class GO2RoughCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
