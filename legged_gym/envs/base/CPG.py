@@ -33,19 +33,18 @@ class CPG_RL():
                  omega_swing = 8*2*np.pi,
                  omega_stance = 2*2*np.pi,
                  gait = "TROT",
-                 couple = False,
+                 couple = True,
                  coupling_strength = 1.0,
                  time_step = 0.001,
                  robot_height = 0.3,
-                 de_step_leg = 0.03,
-                 ground_clearance = 0.07,
-                 ground_penetration = 0.01,
+                 ground_clearance = 0.10,
+                 ground_penetration = 0.035,
                  num_envs=1,
                  device = None,
                  rl_task_string = None,
                  mu_low = 1.0,
                  mu_up = 4.0,
-                 max_step_length = 0.1):
+                 max_step_length = 0.15):
         
         self.rl_task_string = rl_task_string
         self._device = device
@@ -74,13 +73,13 @@ class CPG_RL():
         self._ground_clearance = ground_clearance
         self._ground_penetration = ground_penetration
         self._robot_height = robot_height
-        self._de_step_leg = de_step_leg
 
     def reset(self, env_ids):
         self._mu[env_ids,:]= 0
         self.X[env_ids,0, :] = torch.rand(len(env_ids), 4, device = self._device) * .1
         self.X[env_ids,1, :] = self.PHI[0,:] #0.0
         self.X_dot[env_ids,:,:] = 0
+
     def _set_gait(self, gait):
         trot = torch.tensor([[0, 1, 1, 0],
                              [-1, 0, 0, -1],
@@ -96,16 +95,7 @@ class CPG_RL():
         
     def update_offset_x(self, offset):
         self._offset_x = offset
-    
-    def update(self):
-        device = self._device
-        self.integrate_oscillator_equations()
-        x = self.X[:,0,:] * torch.cos(self.X[:,1,:])
-        z = torch.where(torch.sin(self.X[:,1,:]) > 0,
-                        -self._robot_height + self._ground_clearance*torch.sin(self.X[:,1,:]),
-                        -self._robot_height + self._ground_penetration*torch.sin(self.X[:,1,:]))
-        
-        return -self._de_step_leg * x, z
+
     
     def _scale_helper(self, action, lower_lim, upper_lim):
         new_a = lower_lim + 0.5*(action+1) * (upper_lim - lower_lim )
@@ -185,3 +175,4 @@ class CPG_RL():
         output = torch.stack([hip_roll_angle, hip_thigh_angle, knee_angle], dim=-1)
         
         return output.view(-1, 12)
+    

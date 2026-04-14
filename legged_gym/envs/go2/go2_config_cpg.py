@@ -30,7 +30,7 @@ class GO2CPGCfg( LeggedRobotCfg ):
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
         control_type = 'CPG_OFFSETX'
-        stiffness = {'joint':70.}  # [N*m/rad]
+        stiffness = {'joint':100.}  # [N*m/rad]
         damping = {'joint': 2.}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle
         action_scale = 0.25
