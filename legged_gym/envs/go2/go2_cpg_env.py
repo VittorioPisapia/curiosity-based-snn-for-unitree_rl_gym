@@ -13,8 +13,9 @@ class GO2CPGEnv(LeggedRobot):
     def __init__(self, cfg: LeggedRobotCfg, sim_params, physics_engine, sim_device, headless):
         super().__init__(cfg=cfg, sim_params=sim_params, physics_engine=physics_engine, sim_device=sim_device, headless=headless)
 
-        self.frequency_high = 1.0 * 2 * np.pi
-        self.frequency_low  = 0.5 * 2 * np.pi
+        self.frequency_high = 0.7 * 2 * np.pi
+        self.frequency_low  = 0.2 * 2 * np.pi
+        self.max_vel = 1.0
 
         class Go2Kinematics:
             def __init__(self):
@@ -23,7 +24,7 @@ class GO2CPGEnv(LeggedRobot):
                 self.calf_link_length = 0.213
 
         self.robot_kinematics = Go2Kinematics()
-        self.cpg = CPG_RL(num_envs=self.num_envs, device=self.device, rl_task_string="", time_step=self.dt)
+        self.cpg = CPG_RL(num_envs=self.num_envs, device=self.device, rl_task_string="CPG_OFFSETX", time_step=self.dt)
 
     def reset_idx(self, env_ids):
         super().reset_idx(env_ids)
@@ -53,7 +54,6 @@ class GO2CPGEnv(LeggedRobot):
     
     def _compute_torques(self, actions):
         """ Compute torques from CPG Signals """
-        actions = torch.zeros_like(actions)
         actions_scaled = actions * self.cfg.control.action_scale
         control_type = self.cfg.control.control_type
         normal_forces = self.contact_forces[:, self.feet_indices, 2] > 1.
@@ -72,3 +72,12 @@ class GO2CPGEnv(LeggedRobot):
             raise NameError(f"Unknown controller type: {control_type}")
         
         return torch.clip(torques, -self.torque_limits, self.torque_limits)
+    
+    def _reward_forward_vel(self):
+        return torch.clamp(self.base_lin_vel[:, 0], min=0.0, max=self.max_vel)
+    
+    def _reward_energy(self): # Penalize energy 
+        return torch.sum(torch.abs(self.torques*self.dof_vel), dim=1)
+    
+    def _reward_feet_contact_forces(self): # penalize high contact forces 
+        return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) - self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)

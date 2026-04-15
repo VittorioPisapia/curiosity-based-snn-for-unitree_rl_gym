@@ -45,17 +45,43 @@ class GO2CPGCfg( LeggedRobotCfg ):
         terminate_after_contacts_on = ["base"]
         self_collisions = 1 # 1 to disable, 0 to enable...bitwise filter
   
-    class rewards( LeggedRobotCfg.rewards ):
+    class rewards(LeggedRobotCfg.rewards):
         soft_dof_pos_limit = 0.9
-        base_height_target = 0.25
-        class scales( LeggedRobotCfg.rewards.scales ):
-            torques = -0.0002
-            dof_pos_limits = -10.0
+        base_height_target = 0.32
+        only_positive_rewards = True   
+        tracking_sigma = 0.25
+        max_contact_force = 150.0
 
-            base_height = -15 #TODO now seems too low
-            feet_air_time = 1.5
-            action_rate = -0.02
-            slip = 0.0
+        class scales(LeggedRobotCfg.rewards.scales):
+
+            # ---- TASK ----
+            tracking_lin_vel = 2.0
+            tracking_ang_vel = 0.0
+            forward_vel = 0.0
+
+            # ---- STABILITY ----
+            orientation = -1.0
+
+            # ---- EFFICIENCY ----
+            energy = -0.002
+
+            # ---- CONTACT QUALITY ----
+            feet_contact_forces = -0.02
+            slip = -0.1
+
+            # ---- GAIT SHAPING ----
+            feet_air_time = 0.3
+
+            # ---- LIGHT REGULARIZATION ----
+            action_rate = -0.01
+            torques = -0.0001
+            dof_pos_limits = -5.0
+
+            # ---- DISABLED (important for CPG) ----
+            dof_acc = 0.0
+            dof_vel = 0.0
+            base_height = 0.0
+            collision = 0.0
 
 class GO2CPGCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):
