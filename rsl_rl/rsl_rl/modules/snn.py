@@ -81,9 +81,9 @@ class LIFGaussian(Neurons):
             
         spikes_reset = 1  # if 0 the previous v mem is reset
         if spiking_neurons:
-            #spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
+            spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
 
-            spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])
+            #spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])
         
         output["snn_m"] = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
         if spiking_neurons:
