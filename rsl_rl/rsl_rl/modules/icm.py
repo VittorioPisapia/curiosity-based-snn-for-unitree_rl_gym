@@ -8,7 +8,7 @@ import math
 from typing import List, Dict, Union, Any, Tuple
 from abc import abstractmethod
 import torch.nn.functional as F
-from actor_critic import get_activation
+from .actor_critic import get_activation
 
 class ICM(nn.Module):
     def __init__(
