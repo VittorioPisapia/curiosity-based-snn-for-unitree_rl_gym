@@ -184,7 +184,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         # SNN parameters
         snn_threshold = 0.5
         snn_lens = 0.3
-        snn_st = 2
+        snn_st = 1
         
         # only for 'ActorCriticRecurrent':
         # rnn_type = 'lstm'
