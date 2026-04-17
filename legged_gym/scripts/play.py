@@ -82,6 +82,9 @@ def play(args):
         actions = policy(obs.detach())
         obs, _, rews, dones, infos = env.step(actions.detach())
 
+        #current_cot_val = env.current_cot[0].item() 
+        #print(f"Step {i:04d} | Cost of Transport: {current_cot_val:.4f}")
+
         if args.record:
             robot_pos = env.root_states[0, :3].cpu().numpy()
             env_origin = env.gym.get_env_origin(env.envs[0])
