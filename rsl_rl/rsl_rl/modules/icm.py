@@ -8,6 +8,7 @@ import math
 from typing import List, Dict, Union, Any, Tuple
 from abc import abstractmethod
 import torch.nn.functional as F
+from actor_critic import get_activation
 
 class ICM(nn.Module):
     def __init__(
@@ -59,25 +60,6 @@ class ICM(nn.Module):
     def compute_encoded(self, state):
         encoded_state = self.encoder_model(state)
         return encoded_state
-          
 
-def get_activation(act_name):
-    if act_name == "elu":
-        return nn.ELU()
-    elif act_name == "selu":
-        return nn.SELU()
-    elif act_name == "relu":
-        return nn.ReLU()
-    elif act_name == "crelu":
-        return nn.ReLU()
-    elif act_name == "lrelu":
-        return nn.LeakyReLU()
-    elif act_name == "tanh":
-        return nn.Tanh()
-    elif act_name == "sigmoid":
-        return nn.Sigmoid()
-    else:
-        print("invalid activation function!")
-        return None
 
 
