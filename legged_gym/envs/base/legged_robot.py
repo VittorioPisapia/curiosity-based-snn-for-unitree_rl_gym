@@ -103,6 +103,7 @@ class LeggedRobot(BaseTask):
 
         # compute observations, rewards, resets, ...
         self.check_termination()
+        self._compute_cot_metric()
         self.compute_reward()
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         self.reset_idx(env_ids)
@@ -142,6 +143,7 @@ class LeggedRobot(BaseTask):
         self._reset_root_states(env_ids)
 
         self._resample_commands(env_ids)
+        mean_cot = self.episode_cot_sum[env_ids] / self.episode_length_buf[env_ids]
 
         # reset buffers
         self.actions[env_ids] = 0.
@@ -155,6 +157,11 @@ class LeggedRobot(BaseTask):
         for key in self.episode_sums.keys():
             self.extras["episode"]['rew_' + key] = torch.mean(self.episode_sums[key][env_ids]) / self.max_episode_length_s
             self.episode_sums[key][env_ids] = 0.
+        if len(env_ids) > 0:
+            self.extras["episode"]["mean_raw_cot"] = torch.mean(mean_cot)
+        # log additional curriculum info
+        if self.cfg.terrain.curriculum:
+            self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
         if self.cfg.commands.curriculum:
             self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
         # send timeout info to the algorithm
@@ -339,6 +346,20 @@ class LeggedRobot(BaseTask):
         else:
             raise NameError(f"Unknown controller type: {control_type}")
         return torch.clip(torques, -self.torque_limits, self.torque_limits)
+    
+    def _compute_cot_metric(self):
+        mechanical_work = torch.sum(torch.abs(self.torques * self.dof_vel), dim=1)      
+        
+        horizontal_vel = torch.norm(self.base_lin_vel[:, :2], dim=1)
+        horizontal_vel = torch.clamp(horizontal_vel, min=0.01)
+        
+        gravity = 9.81    
+        weight = self.total_mass * gravity  
+        
+        cot = mechanical_work / (weight * horizontal_vel)
+        
+        self.current_cot = cot 
+        self.episode_cot_sum += cot
 
     def _reset_dofs(self, env_ids):
         """ Resets DOF position and velocities of selected environmments
@@ -472,6 +493,8 @@ class LeggedRobot(BaseTask):
         self.base_lin_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 7:10])
         self.base_ang_vel = quat_rotate_inverse(self.base_quat, self.root_states[:, 10:13])
         self.projected_gravity = quat_rotate_inverse(self.base_quat, self.gravity_vec)
+        self.episode_cot_sum = torch.zeros(self.num_envs, dtype=torch.float, device=self.device, requires_grad=False)
+
       
 
         # joint positions offsets and PD gains
@@ -639,6 +662,7 @@ class LeggedRobot(BaseTask):
             self.envs.append(env_handle)
             self.actor_handles.append(actor_handle)
 
+        self.total_mass = sum([prop.mass for prop in body_props])
         self.feet_indices = torch.zeros(len(feet_names), dtype=torch.long, device=self.device, requires_grad=False)
         for i in range(len(feet_names)):
             self.feet_indices[i] = self.gym.find_actor_rigid_body_handle(self.envs[0], self.actor_handles[0], feet_names[i])
@@ -774,6 +798,12 @@ class LeggedRobot(BaseTask):
         return torch.sum((torch.norm(self.contact_forces[:, self.feet_indices, :], dim=-1) -  self.cfg.rewards.max_contact_force).clip(min=0.), dim=1)
 
     def _reward_cost_of_transport(self):
-        # penalize high CoT 
-        # TODO not implemented
-        return
+        # Penalize high cost of transport (energy per distance traveled)   TODO testing needed
+        return self.current_cot
+    
+    def _reward_slip(self):
+        # Penalize foot slip: high horizontal foot velocity while in contact with the ground   TODO need to filter the contacts because the contact reporting of PhysX is unreliable on meshes
+        foot_velocities = self.rigid_body_states[:, self.feet_indices, 7:10]
+        foot_velocities_xy = torch.norm(foot_velocities[:, :, :2], dim=2)
+        contact = self.contact_forces[:, self.feet_indices, 2] > 1.0
+        return torch.sum(contact * foot_velocities_xy, dim=1)
