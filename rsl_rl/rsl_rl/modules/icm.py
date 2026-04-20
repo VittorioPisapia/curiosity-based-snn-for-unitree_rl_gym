@@ -16,7 +16,7 @@ class ICM(nn.Module):
             num_obs ,
             num_actions,
             hidden_dimension = 128,
-            encoder_output=64,
+            encoder_output = 64,
             activation = "relu"):
             
             super(ICM,self).__init__()
