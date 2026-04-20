@@ -7,6 +7,8 @@ import math
 from typing import List, Dict, Union, Any, Tuple
 from abc import abstractmethod
 
+NEURON_TYPE = "Gaussian" # "Gaussian" or "BPTT"
+
 class Neurons(nn.Module):
     def __init__(
             self,
@@ -70,20 +72,19 @@ class LIFGaussian(Neurons):
 
         self._set_hidden_states(hidden_states, (batch_sz, layer_sz))
 
-        # v_prev = self.hidden_states_tensors["snn_m"]  #TODO: try soft-reset of the membrane potential, i.e. reset to v - thresh instead of 0
+        # SOFT RESET  #TODO: try soft-reset of the membrane potential, i.e. reset to v - thresh instead of 0
 
+        # v_prev = self.hidden_states_tensors["snn_m"] 
         # if spiking_neurons:
         #     v_prev = v_prev * -(self.hidden_states_tensors["snn_s"]*thresholds)
-        
         # decayed_m = v_prev * decays
-
         # output["snn_m"] = decayed_m + x
             
         spikes_reset = 1  # if 0 the previous v mem is reset
         if spiking_neurons:
             spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
 
-            #spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])
+            #spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])   # Partial reset
         
         output["snn_m"] = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
         if spiking_neurons:
@@ -146,8 +147,10 @@ class SNN(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, output_dim)
 
-        self.fs = LIFGaussian(lens=lens, device=self.device)
-        #self.fs = LIF_BPTT(decay=0.5, threshold=threshold_init, device=self.device)
+        if NEURON_TYPE == "Gaussian":
+            self.fs = LIFGaussian(lens=lens, device=self.device)
+        elif NEURON_TYPE == "BPTT":
+            self.fs = LIF_BPTT(device=self.device)
 
         self.spike_dim = 2 * hidden_dim
         self.mem_dim = 2 * hidden_dim
