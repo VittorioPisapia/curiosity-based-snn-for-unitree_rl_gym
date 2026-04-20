@@ -110,17 +110,14 @@ class SpikeFunctionBPTT(torch.autograd.Function):
 class LIF_BPTT(Neurons):
     def __init__(
             self,
-            decay: float,
-            threshold: float,
+            #decay: float,
+            #threshold: float,
             device: Union[str, torch.device],
             **kwards,
         ) -> None:
         super().__init__(["snn_s", "snn_m"], SpikeFunctionBPTT, device)
 
-        self.decay = decay
-        self.threshold = threshold
-
-    def forward(self, x, hidden_states, spiking_neurons):
+    def forward(self, x, thresholds, decays, hidden_states, spiking_neurons):
         output = {}
         batch_sz, layer_sz = x.shape[0], x.shape[1]
 
@@ -130,10 +127,10 @@ class LIF_BPTT(Neurons):
         if spiking_neurons:
             spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
         
-        output["snn_m"] = self.hidden_states_tensors["snn_m"] * self.decay * spikes_reset + x
+        output["snn_m"] = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
         if spiking_neurons:
             output["snn_s"] = self.spike_function(
-                output["snn_m"] - self.threshold / self.threshold, .3
+                output["snn_m"] - thresholds / thresholds, .3
             )
         return output
 
@@ -150,6 +147,7 @@ class SNN(nn.Module):
         self.fc3 = nn.Linear(hidden_dim, output_dim)
 
         self.fs = LIFGaussian(lens=lens, device=self.device)
+        #self.fs = LIF_BPTT(decay=0.5, threshold=threshold_init, device=self.device)
 
         self.spike_dim = 2 * hidden_dim
         self.mem_dim = 2 * hidden_dim
