@@ -58,6 +58,7 @@ class OnPolicyRunner:
         self.eta = self.policy_cfg.get("icm_eta", 0.005)
         self.beta = self.policy_cfg.get("icm_beta", 0.2)
         self.intrinsic_coeff = self.policy_cfg.get("icm_intrinsic_coeff", 0.01)
+        self.icm_reward_clamp = self.policy_cfg.get("icm_reward_clamp", 0.2)
         self.running_std = torch.tensor(1.0, device=self.device)
 
         self.icm_obs = []
@@ -145,7 +146,7 @@ class OnPolicyRunner:
                     self.running_std = 0.99 * self.running_std + 0.01 * current_std
 
                     intrinsic_reward = intrinsic_reward / (self.running_std + 1e-8)
-                    intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, 0.3)
+                    intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, self.icm_reward_clamp)
 
                     intrinsic_reward = intrinsic_reward.detach()
                     intrinsic_reward = intrinsic_reward.squeeze(-1)
