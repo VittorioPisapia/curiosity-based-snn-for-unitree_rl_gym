@@ -1,12 +1,10 @@
-import sys
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
 import sys
-from legged_gym import LEGGED_GYM_ROOT_DIR
-
+import imageio
 import isaacgym
 from isaacgym import gymapi
-import imageio
+
 from legged_gym.envs import *
 from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path
 from datetime import datetime
@@ -14,9 +12,13 @@ from datetime import datetime
 import numpy as np
 import torch
 
+import matplotlib.pyplot as plt
+
+
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
+
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     env_cfg.terrain.num_rows = 5
@@ -38,7 +40,6 @@ def play(args):
     if hasattr(env_cfg.env, "enable_camera_sensors"):
         env_cfg.env.enable_camera_sensors = True
 
-
     # prepare environment
     env, _ = task_registry.make_env(name=args.task, args=args, env_cfg=env_cfg)
     obs = env.get_observations()
@@ -46,6 +47,17 @@ def play(args):
     train_cfg.runner.resume = True
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
     policy = ppo_runner.get_inference_policy(device=env.device)
+
+       
+    log_cmd_vel_x, log_act_vel_x = [], []
+    log_cmd_vel_y, log_act_vel_y = [], []
+    log_cmd_yaw, log_act_yaw = [], []   
+    log_target_z, log_actual_z = [], []
+    log_foot_x, log_foot_y, log_foot_z = [], [], []
+    foot_idx = env.feet_indices[0] 
+    robot_idx = 0 
+    target_base_height = env.cfg.rewards.base_height_target
+    log_cot_val = []
     
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
@@ -76,35 +88,111 @@ def play(args):
         
         video_writer = imageio.get_writer(video_path, fps=50)
         print("Starting headless video recording...")
-        print(f"Video will be saved to: {video_path}")    
+        print(f"Video will be saved to: {video_path}")
 
-    for i in range(10*int(env.max_episode_length)):
-        actions = policy(obs.detach())
-        obs, _, rews, dones, infos = env.step(actions.detach())
+    try:
+        for i in range(10*int(env.max_episode_length)):
+            actions = policy(obs.detach())
+            obs, _, rews, dones, infos = env.step(actions.detach())
+            env.gym.refresh_rigid_body_state_tensor(env.sim)
 
-        current_cot_val = env.current_cot[0].item() 
-        print(f"Step {i:04d} | Cost of Transport: {current_cot_val:.4f}")
-        if args.record:
-                    robot_pos = env.root_states[0, :3].cpu().numpy()
-                    env_origin = env.gym.get_env_origin(env.envs[0])
-                    local_x = robot_pos[0] - env_origin.x
-                    local_y = robot_pos[1] - env_origin.y
-                    local_z = robot_pos[2] - env_origin.z
-                    
-                    cam_pos = gymapi.Vec3(local_x + 2.0, local_y + 2.0, local_z + 1.0)
-                    cam_target = gymapi.Vec3(local_x, local_y, local_z)
-                    env.gym.set_camera_location(camera_handle, env.envs[0], cam_pos, cam_target)
-                    
-                    env.gym.fetch_results(env.sim, True)
+            log_cmd_vel_x.append(env.commands[robot_idx, 0].item())
+            log_act_vel_x.append(env.base_lin_vel[robot_idx, 0].item())
 
-                    env.gym.step_graphics(env.sim)
-                    env.gym.render_all_camera_sensors(env.sim)
-                    
-                    image = env.gym.get_camera_image(env.sim, env.envs[0], camera_handle, gymapi.IMAGE_COLOR)
-                    image_np = image.reshape((camera_props.height, camera_props.width, 4))
-                    rgb_image = image_np[..., :3] 
-                    
-                    video_writer.append_data(rgb_image)
+            log_cmd_vel_y.append(env.commands[robot_idx, 1].item())
+            log_act_vel_y.append(env.base_lin_vel[robot_idx, 1].item())
+
+            log_cmd_yaw.append(env.commands[robot_idx, 2].item())
+            log_act_yaw.append(env.base_ang_vel[robot_idx, 2].item())
+
+            log_target_z.append(target_base_height)
+            log_actual_z.append(env.root_states[robot_idx, 2].item())
+
+            foot_pos = env.rigid_body_states[robot_idx, foot_idx, 0:3].cpu().numpy()
+            log_foot_x.append(foot_pos[0])
+            log_foot_y.append(foot_pos[1])
+            log_foot_z.append(foot_pos[2])
+
+            current_cot_val = env.current_cot[0].item() 
+            log_cot_val.append(current_cot_val)
+
+            if args.record:
+                        robot_pos = env.root_states[0, :3].cpu().numpy()
+                        env_origin = env.gym.get_env_origin(env.envs[0])
+                        local_x = robot_pos[0] - env_origin.x
+                        local_y = robot_pos[1] - env_origin.y
+                        local_z = robot_pos[2] - env_origin.z
+                        
+                        cam_pos = gymapi.Vec3(local_x + 2.0, local_y + 2.0, local_z + 1.0)
+                        cam_target = gymapi.Vec3(local_x, local_y, local_z)
+                        env.gym.set_camera_location(camera_handle, env.envs[0], cam_pos, cam_target)
+                        
+                        env.gym.fetch_results(env.sim, True)
+
+                        env.gym.step_graphics(env.sim)
+                        env.gym.render_all_camera_sensors(env.sim)
+                        
+                        image = env.gym.get_camera_image(env.sim, env.envs[0], camera_handle, gymapi.IMAGE_COLOR)
+                        image_np = image.reshape((camera_props.height, camera_props.width, 4))
+                        rgb_image = image_np[..., :3] 
+                        
+                        video_writer.append_data(rgb_image)
+    
+    except KeyboardInterrupt:
+        
+        print("\nSimulation stopped by user! Generating plots...")
+
+    if len(log_cmd_vel_x) > 0:
+        print(f"Plotting {len(log_cmd_vel_x)} steps of simulation...")
+        
+        
+        time_axis = np.arange(len(log_cmd_vel_x)) * env.dt
+
+        fig, axs = plt.subplots(5, 1, figsize=(12, 12))
+      
+        axs[0].plot(time_axis, log_cmd_vel_x, 'r--', label='Cmd Lin X')
+        axs[0].plot(time_axis, log_act_vel_x, 'r', label='Act Lin X')
+        axs[0].plot(time_axis, log_cmd_vel_y, 'g--', label='Cmd Lin Y')
+        axs[0].plot(time_axis, log_act_vel_y, 'g', label='Act Lin Y')
+        axs[0].set_title('Commanded vs Actual Linear Velocities')
+        axs[0].set_ylabel('Velocity (m/s or rad/s)')
+        axs[0].legend(loc='upper right', ncol=3)
+        axs[0].grid(True)
+
+        axs[1].plot(time_axis, log_cmd_yaw, 'b--', label='Cmd Ang Z (Yaw)')
+        axs[1].plot(time_axis, log_act_yaw, 'b', label='Act Ang Z (Yaw)')
+        axs[1].set_title('Commanded vs Actual Angular Velocities')
+        axs[1].set_ylabel('Angular Velocity (rad/s)')
+        axs[1].legend(loc='upper right', ncol=3)
+        axs[1].grid(True)
+        
+        axs[2].plot(time_axis, log_target_z, 'k--', label='Target Height')
+        axs[2].plot(time_axis, log_actual_z, 'k', label='Actual Height')
+        axs[2].set_title('Base Height (Z)')
+        axs[2].set_ylabel('Height (m)')
+        axs[2].legend(loc='upper right')
+        axs[2].grid(True)
+    
+        axs[3].plot(time_axis, log_foot_x, 'r', label='Foot X')
+        axs[3].plot(time_axis, log_foot_y, 'g', label='Foot Y')
+        axs[3].plot(time_axis, log_foot_z, 'b', label='Foot Z')
+        axs[3].set_title('Global Position of Individual Foot')
+        axs[3].set_xlabel('Time (s)')
+        axs[3].set_ylabel('Position (m)')
+        axs[3].legend(loc='upper right')
+        axs[3].grid(True)
+
+        axs[4].plot(time_axis, log_cot_val, 'm', label='COT')
+        axs[4].set_title('Cost of Transport')
+        axs[4].set_xlabel('Time (s)')
+        axs[4].set_ylabel('COT')
+        axs[4].legend(loc='upper right')
+        axs[4].grid(True)
+
+        plt.tight_layout()
+        plt.show()
+    else:
+        print("No data collected.")
 
     if args.record:
         video_writer.close()
