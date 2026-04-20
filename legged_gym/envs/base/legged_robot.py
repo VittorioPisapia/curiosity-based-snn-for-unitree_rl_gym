@@ -87,7 +87,7 @@ class LeggedRobot(BaseTask):
         """
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
-        self.gym.refresh_rigid_body_state_tensor(self.sim) #TODO debug and check
+        self.gym.refresh_rigid_body_state_tensor(self.sim) 
 
         self.episode_length_buf += 1
         self.common_step_counter += 1
@@ -491,12 +491,13 @@ class LeggedRobot(BaseTask):
         actor_root_state = self.gym.acquire_actor_root_state_tensor(self.sim)
         dof_state_tensor = self.gym.acquire_dof_state_tensor(self.sim)
         net_contact_forces = self.gym.acquire_net_contact_force_tensor(self.sim)
-        rigid_body_state_tensor = self.gym.acquire_rigid_body_state_tensor(self.sim) 
+        rigid_body_state = self.gym.acquire_rigid_body_state_tensor(self.sim)
 
         self.gym.refresh_dof_state_tensor(self.sim)
         self.gym.refresh_actor_root_state_tensor(self.sim)
         self.gym.refresh_net_contact_force_tensor(self.sim)
         self.gym.refresh_rigid_body_state_tensor(self.sim) 
+        
 
         # create some wrapper tensors for different slices
         self.root_states = gymtorch.wrap_tensor(actor_root_state)
@@ -507,8 +508,8 @@ class LeggedRobot(BaseTask):
         self.rpy = get_euler_xyz_in_tensor(self.base_quat)
         self.base_pos = self.root_states[:self.num_envs, 0:3]
         self.contact_forces = gymtorch.wrap_tensor(net_contact_forces).view(self.num_envs, -1, 3) # shape: num_envs, num_bodies, xyz axis
-        self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_state_tensor).view(self.num_envs, -1, 13) 
-
+        self.rigid_body_states = gymtorch.wrap_tensor(rigid_body_state).view(self.num_envs, -1, 13) 
+        
         # initialize some data used later on
         self.common_step_counter = 0
         self.extras = {}
