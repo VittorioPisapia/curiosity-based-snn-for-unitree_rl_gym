@@ -72,20 +72,19 @@ class LIFGaussian(Neurons):
 
         self._set_hidden_states(hidden_states, (batch_sz, layer_sz))
 
-        # v_prev = self.hidden_states_tensors["snn_m"]  #TODO: try soft-reset of the membrane potential, i.e. reset to v - thresh instead of 0
+        # SOFT RESET  #TODO: try soft-reset of the membrane potential, i.e. reset to v - thresh instead of 0
 
+        # v_prev = self.hidden_states_tensors["snn_m"] 
         # if spiking_neurons:
         #     v_prev = v_prev * -(self.hidden_states_tensors["snn_s"]*thresholds)
-        
         # decayed_m = v_prev * decays
-
         # output["snn_m"] = decayed_m + x
             
         spikes_reset = 1  # if 0 the previous v mem is reset
         if spiking_neurons:
             spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
 
-            #spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])
+            #spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])   # Partial reset
         
         output["snn_m"] = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
         if spiking_neurons:
