@@ -7,6 +7,8 @@ import math
 from typing import List, Dict, Union, Any, Tuple
 from abc import abstractmethod
 
+NEURON_TYPE = "Gaussian" # "Gaussian" or "BPTT"
+
 class Neurons(nn.Module):
     def __init__(
             self,
@@ -146,8 +148,10 @@ class SNN(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, output_dim)
 
-        self.fs = LIFGaussian(lens=lens, device=self.device)
-        #self.fs = LIF_BPTT(decay=0.5, threshold=threshold_init, device=self.device)
+        if NEURON_TYPE == "Gaussian":
+            self.fs = LIFGaussian(lens=lens, device=self.device)
+        elif NEURON_TYPE == "BPTT":
+            self.fs = LIF_BPTT(device=self.device)
 
         self.spike_dim = 2 * hidden_dim
         self.mem_dim = 2 * hidden_dim
