@@ -57,8 +57,9 @@ class ActorCritic(nn.Module):
         self.hidden_states = None
         mlp_input_dim_a = num_actor_obs
         mlp_input_dim_c = num_critic_obs
+        snn_neuron_type = kwargs.get('neuron_type', 'Gaussian')
 
-        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda")
+        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda", neuron_type=snn_neuron_type)
 
        # Value function
         critic_layers = []

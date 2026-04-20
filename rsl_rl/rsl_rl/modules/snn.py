@@ -7,7 +7,6 @@ import math
 from typing import List, Dict, Union, Any, Tuple
 from abc import abstractmethod
 
-NEURON_TYPE = "Gaussian" # "Gaussian" or "BPTT"
 
 class Neurons(nn.Module):
     def __init__(
@@ -137,7 +136,7 @@ class LIF_BPTT(Neurons):
 
 
 class SNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.5, lens=0.3):
+    def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.5, lens=0.3, neuron_type="Gaussian"):
         super().__init__()
 
         self.device = torch.device(device) if isinstance(device, str) else device
@@ -147,10 +146,12 @@ class SNN(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, output_dim)
 
-        if NEURON_TYPE == "Gaussian":
+        if neuron_type == "Gaussian":
             self.fs = LIFGaussian(lens=lens, device=self.device)
-        elif NEURON_TYPE == "BPTT":
+        elif neuron_type == "BPTT":
             self.fs = LIF_BPTT(device=self.device)
+        else:
+            raise ValueError(f"Unsupported neuron type: {neuron_type}")
 
         self.spike_dim = 2 * hidden_dim
         self.mem_dim = 2 * hidden_dim

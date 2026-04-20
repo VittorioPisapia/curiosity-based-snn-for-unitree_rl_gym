@@ -183,6 +183,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         snn_threshold = 0.3
         snn_lens = 0.3
         snn_st = 1
+        neuron_type = 'Gaussian' # Gaussian, BPTT
 
         # ICM parameters
 
