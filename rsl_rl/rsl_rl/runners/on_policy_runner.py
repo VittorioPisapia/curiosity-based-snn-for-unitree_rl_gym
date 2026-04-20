@@ -55,10 +55,9 @@ class OnPolicyRunner:
         self.policy_cfg = train_cfg["policy"]
         self.device = device
         self.env = env
-        self.eta = self.policy_cfg.get("icm_eta", 0.005)
-        self.beta = self.policy_cfg.get("icm_beta", 0.2)
+        self.beta = self.policy_cfg.get("icm_beta", 1)
         self.intrinsic_coeff = self.policy_cfg.get("icm_intrinsic_coeff", 0.01)
-        self.icm_reward_clamp = self.policy_cfg.get("icm_reward_clamp", 0.2)
+        self.icm_reward_clamp = self.policy_cfg.get("icm_reward_clamp", 0.05)
         self.running_std = torch.tensor(1.0, device=self.device)
 
         self.icm_obs = []
@@ -79,7 +78,7 @@ class OnPolicyRunner:
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
         self.icm = ICM(env.num_obs, env.num_actions, hidden_dimension=128, activation="relu").to(self.device)
-        self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-3)
+        self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-4)
 
         # init storage and model
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])
@@ -120,11 +119,14 @@ class OnPolicyRunner:
             intrinsic_sum = 0.0
             count = 0
             # Rollout
-            with torch.inference_mode():
+            with torch.no_grad():
                 for i in range(self.num_steps_per_env):
+
                     prev_obs = obs.clone()
                     actions = self.alg.act(obs, critic_obs)
-                    prev_action = actions
+
+                    prev_action = torch.tanh(actions)
+
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
                     critic_obs = privileged_obs if privileged_obs is not None else obs
 
@@ -132,31 +134,20 @@ class OnPolicyRunner:
                     prev_action = prev_action.to(self.device)
                     obs = obs.to(self.device)
 
-                    # Compute encoded states
+                    # ICM forward
                     encoded_prev = self.icm.compute_encoded(prev_obs)
                     encoded_next = self.icm.compute_encoded(obs)
-
-                    # Compute Forward model
                     forward_value = self.icm.compute_forward(encoded_prev, prev_action)
 
-                    # Compute Intrinsic reward
-                    intrinsic_reward = self.eta * ((encoded_next - forward_value) ** 2).mean(dim=-1, keepdim=True)
+                    intrinsic_reward = ((encoded_next - forward_value) ** 2).mean(dim=-1)
 
-                    current_std = intrinsic_reward.std().item()
-                    self.running_std = 0.99 * self.running_std + 0.01 * current_std
+                    current_std = intrinsic_reward.std()
+                    self.running_std = 0.9 * self.running_std + 0.1 * current_std
 
                     intrinsic_reward = intrinsic_reward / (self.running_std + 1e-8)
                     intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, self.icm_reward_clamp)
 
-                    intrinsic_reward = intrinsic_reward.detach()
-                    intrinsic_reward = intrinsic_reward.squeeze(-1)
-
-                    obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
-
-                    #print("Extrinsic rewards: ", rewards[0:10].tolist())
-                    #print("Intrinsic rewards: ", intrinsic_reward[0].tolist())
-
-                    total_reward = rewards + self.intrinsic_coeff *intrinsic_reward
+                    total_reward = rewards + self.intrinsic_coeff * intrinsic_reward
                     self.alg.process_env_step(total_reward, dones, infos)
 
                     self.icm_obs.append(prev_obs.detach())
@@ -185,16 +176,18 @@ class OnPolicyRunner:
 
                 # Learning step
                 start = stop
-                self.alg.compute_returns(critic_obs)
+
+            self.intrinsic_coeff = max(0.001, self.intrinsic_coeff * 0.999)
+            self.alg.compute_returns(critic_obs)
             
             mean_value_loss, mean_surrogate_loss = self.alg.update()
 
             obs_batch = torch.cat(self.icm_obs, dim=0)
             next_obs_batch = torch.cat(self.icm_next_obs, dim=0)
-            actions_batch = torch.cat(self.icm_actions, dim=0)
+            actions_batch = torch.tanh(torch.cat(self.icm_actions, dim=0))
 
             encoded_obs_batch = self.icm.compute_encoded(obs_batch)
-            encoded_next_obs_batch = self.icm.compute_encoded(next_obs_batch)
+            encoded_next_obs_batch = self.icm.compute_encoded(next_obs_batch).detach() 
             
             pred_next = self.icm.compute_forward(encoded_obs_batch, actions_batch)
             forward_loss = ((pred_next - encoded_next_obs_batch)**2).mean()
@@ -207,6 +200,7 @@ class OnPolicyRunner:
             self.icm_optimizer.zero_grad()
             icm_loss.backward()
             self.icm_optimizer.step()
+            
             if self.log_dir is not None:
                 self.writer.add_scalar("Reward/extrinsic", extrinsic_sum / count, it)
                 self.writer.add_scalar("Reward/intrinsic", intrinsic_sum / count, it)
@@ -215,6 +209,9 @@ class OnPolicyRunner:
                                 self.intrinsic_coeff * (intrinsic_sum / count),
                                 it
                             )
+                self.writer.add_scalar("ICM/forward_loss", forward_loss.item(), it)
+                self.writer.add_scalar("ICM/inverse_loss", inverse_loss.item(), it)
+                self.writer.add_scalar("ICM/std", self.running_std, it)
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:
