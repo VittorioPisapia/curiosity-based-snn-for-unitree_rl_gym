@@ -31,6 +31,8 @@ def train(args):
         "train_config": class_to_dict(train_cfg)
     }
 
+    os.makedirs(ppo_runner.log_dir, exist_ok=True)
+    
     with open(os.path.join(ppo_runner.log_dir, "config.json"), "w") as f:
         json.dump(config_dict, f, indent=4, default=str)
 
