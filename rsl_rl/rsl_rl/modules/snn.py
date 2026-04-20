@@ -89,6 +89,54 @@ class LIFGaussian(Neurons):
         if spiking_neurons:
             output["snn_s"] = self.spike_function(output["snn_m"], thresholds, self.lens)
         return output
+    
+class SpikeFunctionBPTT(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, v_scaled, gamma):
+        ctx.save_for_backward(v_scaled)
+        ctx.gamma = gamma
+        z_ = torch.gt(v_scaled, 0.)
+        z_ = z_.type(torch.float)
+        return z_
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        v_scaled, = ctx.saved_tensors
+        gamma = ctx.gamma
+        zeros = torch.zeros_like(v_scaled, device=v_scaled.device)
+        return torch.maximum(1 - torch.abs(v_scaled), zeros) * gamma * grad_output, None
+
+
+class LIF_BPTT(Neurons):
+    def __init__(
+            self,
+            decay: float,
+            threshold: float,
+            device: Union[str, torch.device],
+            **kwards,
+        ) -> None:
+        super().__init__(["snn_s", "snn_m"], SpikeFunctionBPTT, device)
+
+        self.decay = decay
+        self.threshold = threshold
+
+    def forward(self, x, hidden_states, spiking_neurons):
+        output = {}
+        batch_sz, layer_sz = x.shape[0], x.shape[1]
+
+        self._set_hidden_states(hidden_states, (batch_sz, layer_sz))
+
+        spikes_reset = 1  # if 0 the previous v mem is reset
+        if spiking_neurons:
+            spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
+        
+        output["snn_m"] = self.hidden_states_tensors["snn_m"] * self.decay * spikes_reset + x
+        if spiking_neurons:
+            output["snn_s"] = self.spike_function(
+                output["snn_m"] - self.threshold / self.threshold, .3
+            )
+        return output
+
 
 class SNN(nn.Module):
     def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.3, lens=0.3):
