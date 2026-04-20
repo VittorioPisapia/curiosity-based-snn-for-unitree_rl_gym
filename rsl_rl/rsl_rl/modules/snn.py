@@ -137,7 +137,7 @@ class LIF_BPTT(Neurons):
 
 
 class SNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.3, lens=0.3):
+    def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.5, lens=0.3):
         super().__init__()
 
         self.device = torch.device(device) if isinstance(device, str) else device

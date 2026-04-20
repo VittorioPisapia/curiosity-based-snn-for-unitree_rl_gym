@@ -145,7 +145,7 @@ class OnPolicyRunner:
                     self.running_std = 0.99 * self.running_std + 0.01 * current_std
 
                     intrinsic_reward = intrinsic_reward / (self.running_std + 1e-8)
-                    intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, 0.2)
+                    intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, 0.3)
 
                     intrinsic_reward = intrinsic_reward.detach()
                     intrinsic_reward = intrinsic_reward.squeeze(-1)

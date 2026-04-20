@@ -160,8 +160,8 @@ class LeggedRobot(BaseTask):
         if len(env_ids) > 0:
             self.extras["episode"]["mean_raw_cot"] = torch.mean(mean_cot)
         # log additional curriculum info
-        if self.cfg.terrain.curriculum:
-            self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
+        #if self.cfg.terrain.curriculum:
+        #    self.extras["episode"]["terrain_level"] = torch.mean(self.terrain_levels.float())
         if self.cfg.commands.curriculum:
             self.extras["episode"]["max_command_x"] = self.command_ranges["lin_vel_x"][1]
         # send timeout info to the algorithm
