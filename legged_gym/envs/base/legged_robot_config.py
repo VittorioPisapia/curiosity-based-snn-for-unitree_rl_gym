@@ -185,6 +185,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         snn_threshold = 0.5
         snn_lens = 0.3
         snn_st = 1
+        neuron_type = "Gaussian" # "Gaussian" or "BPTT"
         
         # only for 'ActorCriticRecurrent':
         # rnn_type = 'lstm'
