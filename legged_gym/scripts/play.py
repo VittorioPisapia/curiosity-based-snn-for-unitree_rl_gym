@@ -178,7 +178,6 @@ def play(args):
     
         axs[3].plot(time_axis, log_foot_x, 'r', label='Foot X')
         axs[3].plot(time_axis, log_foot_y, 'g', label='Foot Y')
-        axs[3].plot(time_axis, log_foot_z, 'b', label='Foot Z')
         axs[3].set_title('Global Position of Individual Foot')
         axs[3].set_xlabel('Time (s)')
         axs[3].set_ylabel('Position (m)')
@@ -200,7 +199,22 @@ def play(args):
         axs[5].grid(True)
 
         plt.tight_layout()
-        plt.show()
+        if args.plot:
+            experiment_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)     
+            model_path = get_load_path(root=experiment_root, 
+                                    load_run=args.load_run, 
+                                    checkpoint=args.checkpoint)
+            experiment_dir = os.path.dirname(model_path) 
+            plots_dir = os.path.join(experiment_dir, 'plots')
+            os.makedirs(plots_dir, exist_ok=True)
+            timestamp_plot = datetime.now().strftime('%b%d_%H-%M-%S')
+            plot_path = os.path.join(plots_dir, f"{timestamp_plot}_eval_plots.png")
+            plt.savefig(plot_path, dpi=300) 
+            print(f"Plots saved in : {plot_path}")
+        
+        plt.show() 
+        
+
     else:
         print("No data collected.")
 
