@@ -160,6 +160,8 @@ class LeggedRobot(BaseTask):
         self.feet_air_time[env_ids] = 0.
         self.episode_length_buf[env_ids] = 0
         self.reset_buf[env_ids] = 1
+        self.episode_cot_sum[env_ids] = 0.0
+        
         # fill extras
         self.extras["episode"] = {}
         for key in self.episode_sums.keys():
