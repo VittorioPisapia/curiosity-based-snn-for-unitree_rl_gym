@@ -4,9 +4,10 @@ import sys
 import imageio
 import isaacgym
 from isaacgym import gymapi
+import random
 
 from legged_gym.envs import *
-from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path
+from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path, set_seed
 from datetime import datetime
 
 import numpy as np
@@ -18,7 +19,8 @@ import matplotlib.pyplot as plt
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
-
+    seed = train_cfg.seed
+    
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     env_cfg.terrain.num_rows = 5
@@ -30,10 +32,10 @@ def play(args):
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1.5
 
-    env_cfg.commands.ranges.lin_vel_x=[0,0]
-    env_cfg.commands.ranges.lin_vel_y=[0, 0]
+    env_cfg.commands.ranges.lin_vel_x=[0.5,1]
+    env_cfg.commands.ranges.lin_vel_y=[-1, 1]
     env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
-    env_cfg.commands.ranges.heading=[-3.14,2.14]
+    env_cfg.commands.ranges.heading=[-3.14,3.14]
 
     env_cfg.env.test = True
 
@@ -79,7 +81,7 @@ def play(args):
         video_dir = os.path.join(experiment_dir, 'videos')
         os.makedirs(video_dir, exist_ok=True)
         timestamp = datetime.now().strftime('%b%d_%H-%M-%S')
-        video_path = os.path.join(video_dir, f"{timestamp}_eval.mp4")
+        video_path = os.path.join(video_dir, f"{timestamp}_seed_{seed}_.mp4")
 
         camera_props = gymapi.CameraProperties()
         camera_props.width = 1280
@@ -158,6 +160,7 @@ def play(args):
         mean_cot= sum(log_cot_val)/len(log_cot_val)
 
         fig, axs = plt.subplots(6, 1, figsize=(12, 12))
+        fig.suptitle(f"Run Seed: {seed}", fontsize=14)
       
         axs[0].plot(time_axis, log_cmd_vel_x, 'r--', label='Cmd Lin X')
         axs[0].plot(time_axis, log_act_vel_x, 'r', label='Act Lin X')
@@ -216,7 +219,7 @@ def play(args):
             experiment_dir = os.path.dirname(model_path) 
             plots_dir = os.path.join(experiment_dir, 'plots')
             os.makedirs(plots_dir, exist_ok=True)
-            plot_path = os.path.join(plots_dir, f"{timestamp}_eval_plots.png")
+            plot_path = os.path.join(plots_dir, f"{timestamp}_seed_{seed}.png")
             plt.savefig(plot_path, dpi=300) 
             print(f"Plots saved in : {plot_path}")
         
