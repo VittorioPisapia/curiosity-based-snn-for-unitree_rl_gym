@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
-    seed = args.seed
+    seed = train_cfg.seed
     
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
@@ -32,7 +32,7 @@ def play(args):
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1.5
 
-    env_cfg.commands.ranges.lin_vel_x=[-1,1]
+    env_cfg.commands.ranges.lin_vel_x=[0.5,1]
     env_cfg.commands.ranges.lin_vel_y=[-1, 1]
     env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
     env_cfg.commands.ranges.heading=[-3.14,3.14]
