@@ -188,7 +188,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         # ICM parameters
 
         
-        icm_beta = 1
+        icm_beta = 0.3
         icm_intrinsic_coeff = 0.01
         icm_reward_clamp = 0.05
 
