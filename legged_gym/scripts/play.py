@@ -26,7 +26,7 @@ def play(args):
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.push_robots = True
+    env_cfg.domain_rand.push_robots = False
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1.5
 
@@ -91,7 +91,8 @@ def play(args):
         print(f"Video will be saved to: {video_path}")
 
     try:
-        for i in range(10*int(env.max_episode_length)):
+        for i in range(200):
+        #for i in range(10*int(env.max_episode_length)):
             actions = policy(obs.detach())
             obs, _, rews, dones, infos = env.step(actions.detach())
             env.gym.refresh_rigid_body_state_tensor(env.sim)
@@ -114,6 +115,7 @@ def play(args):
             log_foot_z.append(foot_pos[2])
 
             current_cot_val = env.current_cot[0].item() 
+            print(f"Step {i}: COT = {current_cot_val:.4f}")
             log_cot_val.append(current_cot_val)
 
             if args.record:
@@ -144,11 +146,12 @@ def play(args):
 
     if len(log_cmd_vel_x) > 0:
         print(f"Plotting {len(log_cmd_vel_x)} steps of simulation...")
+        print(f"Mean COT: {sum(log_cot_val)/len(log_cot_val):.4f}")
         
         
         time_axis = np.arange(len(log_cmd_vel_x)) * env.dt
 
-        fig, axs = plt.subplots(5, 1, figsize=(12, 12))
+        fig, axs = plt.subplots(6, 1, figsize=(12, 12))
       
         axs[0].plot(time_axis, log_cmd_vel_x, 'r--', label='Cmd Lin X')
         axs[0].plot(time_axis, log_act_vel_x, 'r', label='Act Lin X')
@@ -181,13 +184,20 @@ def play(args):
         axs[3].set_ylabel('Position (m)')
         axs[3].legend(loc='upper right')
         axs[3].grid(True)
-
-        axs[4].plot(time_axis, log_cot_val, 'm', label='COT')
-        axs[4].set_title('Cost of Transport')
+        
+        axs[4].plot(time_axis, log_foot_z, 'b', label='Foot Z')
+        axs[4].set_title('Global Position of Individual Foot')
         axs[4].set_xlabel('Time (s)')
-        axs[4].set_ylabel('COT')
+        axs[4].set_ylabel('Position (m)')
         axs[4].legend(loc='upper right')
         axs[4].grid(True)
+
+        axs[5].plot(time_axis, log_cot_val, 'm', label='COT')
+        axs[5].set_title('Cost of Transport')
+        axs[5].set_xlabel('Time (s)')
+        axs[5].set_ylabel('COT')
+        axs[5].legend(loc='upper right')
+        axs[5].grid(True)
 
         plt.tight_layout()
         plt.show()
