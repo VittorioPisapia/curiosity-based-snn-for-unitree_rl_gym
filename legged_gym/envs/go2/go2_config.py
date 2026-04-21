@@ -46,10 +46,10 @@ class GO2RoughCfg( LeggedRobotCfg ):
             dof_pos_limits = -10.0
 
             # New
-            #base_height = -30 
-            #feet_air_time = 0.01
-            #action_rate = -0.02
-            #slip = -0.01
+            base_height = -30 
+            feet_air_time = 0.01
+            action_rate = -0.02
+            slip = -0.01
             cost_of_transport = -0.05 # -0.05 ~ -0.2
 
 class GO2RoughCfgPPO( LeggedRobotCfgPPO ):
