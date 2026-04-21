@@ -40,6 +40,7 @@ from rsl_rl.algorithms import PPO
 from rsl_rl.modules import ActorCritic
 from rsl_rl.env import VecEnv
 from rsl_rl.modules.icm import ICM
+from rsl_rl.modules.rnd import RND
 
 
 class OnPolicyRunner:
@@ -55,6 +56,7 @@ class OnPolicyRunner:
         self.policy_cfg = train_cfg["policy"]
         self.device = device
         self.env = env
+
         self.beta = self.policy_cfg.get("icm_beta", 1)
         self.intrinsic_coeff = self.policy_cfg.get("icm_intrinsic_coeff", 0.01)
         self.icm_reward_clamp = self.policy_cfg.get("icm_reward_clamp", 0.05)
@@ -63,6 +65,11 @@ class OnPolicyRunner:
         self.icm_obs = []
         self.icm_next_obs = []
         self.icm_actions = []
+
+        self.rnd_obs = []
+        self.rnd_running_std = torch.tensor(1.0, device=self.device)
+        self.intrinsic_coeff = self.policy_cfg.get("rnd_intrinsic_coeff", 0.005)
+        self.rnd_reward_clamp = self.policy_cfg.get("rnd_reward_clamp", 0.05)
 
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
@@ -79,6 +86,8 @@ class OnPolicyRunner:
         self.save_interval = self.cfg["save_interval"]
         self.icm = ICM(env.num_obs, env.num_actions, hidden_dimension=128, activation="relu").to(self.device)
         self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-4)
+        self.rnd = RND(env.num_obs, feature_dim=64, hidden_dimension=128, activation="relu").to(self.device)
+        self.rnd_optimizer = torch.optim.Adam(self.rnd.predictor.parameters(), lr=1e-4)
 
         # init storage and model
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])
