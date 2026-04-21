@@ -4,9 +4,10 @@ import sys
 import imageio
 import isaacgym
 from isaacgym import gymapi
+import random
 
 from legged_gym.envs import *
-from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path
+from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path, set_seed
 from datetime import datetime
 
 import numpy as np
@@ -18,7 +19,8 @@ import matplotlib.pyplot as plt
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
-
+    seed = train_cfg.seed
+    
     # override some parameters for testing
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     env_cfg.terrain.num_rows = 5
@@ -30,10 +32,10 @@ def play(args):
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1.5
 
-    env_cfg.commands.ranges.lin_vel_x=[1,1]
-    env_cfg.commands.ranges.lin_vel_y=[0, 0]
-    env_cfg.commands.ranges.ang_vel_yaw=[0, 0]
-    env_cfg.commands.ranges.heading=[0,0]
+    env_cfg.commands.ranges.lin_vel_x=[0.5,1]
+    env_cfg.commands.ranges.lin_vel_y=[-1, 1]
+    env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
+    env_cfg.commands.ranges.heading=[-3.14,3.14]
 
     env_cfg.env.test = True
 
@@ -62,7 +64,6 @@ def play(args):
     robot_idx = 0 
     target_base_height = env.cfg.rewards.base_height_target
     log_cot_val = []
-    seed = train_cfg.seed
     
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
