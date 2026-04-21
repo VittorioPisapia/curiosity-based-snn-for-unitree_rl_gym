@@ -7,23 +7,23 @@ class RND(nn.Module):
     def __init__(
             self,
             num_obs,
-            hidden_dim = 128,
-            feature_dim = 64,
+            hidden_dimension = 128,
+            feature_dimension = 64,
             activation = "relu"):
         
         super(RND, self).__init__()
 
         target_layers = []
-        target_layers.append(nn.Linear(num_obs, hidden_dim))
+        target_layers.append(nn.Linear(num_obs, hidden_dimension))
         target_layers.append(get_activation(activation))
-        target_layers.append(nn.Linear(hidden_dim, feature_dim))
+        target_layers.append(nn.Linear(hidden_dimension, feature_dimension))
 
         self.target_model=nn.Sequential(*target_layers)  # FIXED
 
         predictor_layers = []
-        predictor_layers.append(nn.Linear(num_obs, hidden_dim))
+        predictor_layers.append(nn.Linear(num_obs, hidden_dimension))
         predictor_layers.append(get_activation(activation))
-        predictor_layers.append(nn.Linear(hidden_dim, feature_dim))
+        predictor_layers.append(nn.Linear(hidden_dimension, feature_dimension))
 
         self.predictor_model=nn.Sequential(*predictor_layers)  # TRAINABLE
 

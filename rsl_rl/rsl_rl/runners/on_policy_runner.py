@@ -86,8 +86,8 @@ class OnPolicyRunner:
         self.save_interval = self.cfg["save_interval"]
         self.icm = ICM(env.num_obs, env.num_actions, hidden_dimension=128, activation="relu").to(self.device)
         self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-4)
-        self.rnd = RND(env.num_obs, feature_dim=64, hidden_dimension=128, activation="relu").to(self.device)
-        self.rnd_optimizer = torch.optim.Adam(self.rnd.predictor.parameters(), lr=1e-4)
+        self.rnd = RND(env.num_obs, feature_dimension=64, hidden_dimension=128, activation="relu").to(self.device)
+        self.rnd_optimizer = torch.optim.Adam(self.rnd.predictor_model.parameters(), lr=1e-4)
 
         # init storage and model
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])

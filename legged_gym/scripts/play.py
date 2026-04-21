@@ -30,8 +30,8 @@ def play(args):
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1.5
 
-    env_cfg.commands.ranges.lin_vel_x=[-1,1]
-    env_cfg.commands.ranges.lin_vel_y=[-1, 1]
+    env_cfg.commands.ranges.lin_vel_x=[0,0]
+    env_cfg.commands.ranges.lin_vel_y=[0, 0]
     env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
     env_cfg.commands.ranges.heading=[-3.14,2.14]
 
@@ -53,12 +53,12 @@ def play(args):
     log_cmd_vel_y, log_act_vel_y = [], []
     log_cmd_yaw, log_act_yaw = [], []   
     log_target_z, log_actual_z = [], []
-    log_foot_x, log_foot_y = [], []
-    log_foot_z1, log_foot_z2, log_foot_z3, log_foot_z4 = [], [], [], []
-    foot_idx1 = env.feet_indices[0]
-    foot_idx2 = env.feet_indices[1] 
-    foot_idx3 = env.feet_indices[2] 
-    foot_idx4 = env.feet_indices[3] 
+    log_foot_FL_x, log_foot_FL_y = [], []
+    log_foot_FL_z, log_foot_FR_z, log_foot_RL_z, log_foot_RR_z = [], [], [], []
+    foot_idx_FL = env.feet_indices[0]
+    foot_idx_FR = env.feet_indices[1] 
+    foot_idx_RL = env.feet_indices[2] 
+    foot_idx_RR = env.feet_indices[3] 
     robot_idx = 0 
     target_base_height = env.cfg.rewards.base_height_target
     log_cot_val = []
@@ -79,7 +79,7 @@ def play(args):
         video_dir = os.path.join(experiment_dir, 'videos')
         os.makedirs(video_dir, exist_ok=True)
         timestamp = datetime.now().strftime('%b%d_%H-%M-%S')
-        video_path = os.path.join(video_dir, f"{timestamp}_headless_eval.mp4")
+        video_path = os.path.join(video_dir, f"{timestamp}_eval.mp4")
 
         camera_props = gymapi.CameraProperties()
         camera_props.width = 1280
@@ -95,7 +95,7 @@ def play(args):
         print(f"Video will be saved to: {video_path}")
 
     try:
-        for i in range(200):
+        for i in range(700):
         #for i in range(10*int(env.max_episode_length)):
             actions = policy(obs.detach())
             obs, _, rews, dones, infos = env.step(actions.detach())
@@ -113,16 +113,16 @@ def play(args):
             log_target_z.append(target_base_height)
             log_actual_z.append(env.root_states[robot_idx, 2].item())
 
-            foot_pos1 = env.rigid_body_states[robot_idx, foot_idx1, 0:3].cpu().numpy()
-            log_foot_x.append(foot_pos1[0])
-            log_foot_y.append(foot_pos1[1])
-            log_foot_z1.append(foot_pos1[2])
-            log_foot_z2.append(env.rigid_body_states[robot_idx, foot_idx2, 2].cpu().numpy())
-            log_foot_z3.append(env.rigid_body_states[robot_idx, foot_idx3, 2].cpu().numpy())
-            log_foot_z4.append(env.rigid_body_states[robot_idx, foot_idx4, 2].cpu().numpy())
+            foot_pos1 = env.rigid_body_states[robot_idx, foot_idx_FL, 0:3].cpu().numpy()
+            log_foot_FL_x.append(foot_pos1[0])
+            log_foot_FL_y.append(foot_pos1[1])
+            log_foot_FL_z.append(foot_pos1[2])
+            log_foot_FR_z.append(env.rigid_body_states[robot_idx, foot_idx_FR, 2].cpu().numpy())
+            log_foot_RL_z.append(env.rigid_body_states[robot_idx, foot_idx_RL, 2].cpu().numpy())
+            log_foot_RR_z.append(env.rigid_body_states[robot_idx, foot_idx_RR, 2].cpu().numpy())
 
             current_cot_val = env.current_cot[0].item() 
-            print(f"Step {i}: COT = {current_cot_val:.4f}")
+            #print(f"Step {i}: COT = {current_cot_val:.4f}")
             log_cot_val.append(current_cot_val)
 
             if args.record:
@@ -153,10 +153,9 @@ def play(args):
 
     if len(log_cmd_vel_x) > 0:
         print(f"Plotting {len(log_cmd_vel_x)} steps of simulation...")
-        print(f"Mean COT: {sum(log_cot_val)/len(log_cot_val):.4f}")
-        
-        
+             
         time_axis = np.arange(len(log_cmd_vel_x)) * env.dt
+        mean_cot= sum(log_cot_val)/len(log_cot_val)
 
         fig, axs = plt.subplots(6, 1, figsize=(12, 12))
       
@@ -183,26 +182,26 @@ def play(args):
         axs[2].legend(loc='upper right')
         axs[2].grid(True)
     
-        axs[3].plot(time_axis, log_foot_x, 'r', label='Foot X')
-        axs[3].plot(time_axis, log_foot_y, 'g', label='Foot Y')
+        axs[3].plot(time_axis, log_foot_FL_x, 'r', label='Foot X')
+        axs[3].plot(time_axis, log_foot_FL_y, 'g', label='Foot Y')
         axs[3].set_title('Global Position of Individual Foot')
         axs[3].set_xlabel('Time (s)')
         axs[3].set_ylabel('Position (m)')
         axs[3].legend(loc='upper right')
         axs[3].grid(True)
         
-        axs[4].plot(time_axis, log_foot_z1, 'r', label='Foot Z1')
-        axs[4].plot(time_axis, log_foot_z2, 'g', label='Foot Z2')
-        axs[4].plot(time_axis, log_foot_z3, 'b', label='Foot Z3')
-        axs[4].plot(time_axis, log_foot_z4, 'y', label='Foot Z4')
-        axs[4].set_title('Global Position of Individual Foot')
+        axs[4].plot(time_axis, log_foot_FL_z, 'r', label='Foot FL_Z')
+        axs[4].plot(time_axis, log_foot_FR_z, 'g', label='Foot FR_Z')
+        axs[4].plot(time_axis, log_foot_RL_z, 'b', label='Foot RL_Z')
+        axs[4].plot(time_axis, log_foot_RR_z, 'y', label='Foot RR_Z')
+        axs[4].set_title('Height')
         axs[4].set_xlabel('Time (s)')
         axs[4].set_ylabel('Position (m)')
         axs[4].legend(loc='upper right')
         axs[4].grid(True)
 
         axs[5].plot(time_axis, log_cot_val, 'm', label='COT')
-        axs[5].set_title('Cost of Transport')
+        axs[5].set_title(f'Cost of Transport (Mean: {mean_cot:.4f})')
         axs[5].set_xlabel('Time (s)')
         axs[5].set_ylabel('COT')
         axs[5].legend(loc='upper right')
@@ -217,8 +216,7 @@ def play(args):
             experiment_dir = os.path.dirname(model_path) 
             plots_dir = os.path.join(experiment_dir, 'plots')
             os.makedirs(plots_dir, exist_ok=True)
-            timestamp_plot = datetime.now().strftime('%b%d_%H-%M-%S')
-            plot_path = os.path.join(plots_dir, f"{timestamp_plot}_eval_plots.png")
+            plot_path = os.path.join(plots_dir, f"{timestamp}_eval_plots.png")
             plt.savefig(plot_path, dpi=300) 
             print(f"Plots saved in : {plot_path}")
         
