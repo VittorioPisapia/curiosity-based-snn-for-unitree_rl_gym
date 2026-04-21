@@ -189,8 +189,12 @@ class LeggedRobotCfgPPO(BaseConfig):
 
         
         icm_beta = 0.3
-        icm_intrinsic_coeff = 0.01
+        icm_intrinsic_coeff = 0.02
         icm_reward_clamp = 0.05
+        use_ICM = False
+        use_RND = True
+        rnd_intrinsic_coeff = 0.005
+        rnd_reward_clamp = 0.05
 
         # only for 'ActorCriticRecurrent':
         # rnn_type = 'lstm'
