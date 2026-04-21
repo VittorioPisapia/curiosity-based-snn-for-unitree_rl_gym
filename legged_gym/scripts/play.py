@@ -53,8 +53,12 @@ def play(args):
     log_cmd_vel_y, log_act_vel_y = [], []
     log_cmd_yaw, log_act_yaw = [], []   
     log_target_z, log_actual_z = [], []
-    log_foot_x, log_foot_y, log_foot_z = [], [], []
-    foot_idx = env.feet_indices[0] 
+    log_foot_x, log_foot_y = [], []
+    log_foot_z1, log_foot_z2, log_foot_z3, log_foot_z4 = [], [], [], []
+    foot_idx1 = env.feet_indices[0]
+    foot_idx2 = env.feet_indices[1] 
+    foot_idx3 = env.feet_indices[2] 
+    foot_idx4 = env.feet_indices[3] 
     robot_idx = 0 
     target_base_height = env.cfg.rewards.base_height_target
     log_cot_val = []
@@ -109,10 +113,13 @@ def play(args):
             log_target_z.append(target_base_height)
             log_actual_z.append(env.root_states[robot_idx, 2].item())
 
-            foot_pos = env.rigid_body_states[robot_idx, foot_idx, 0:3].cpu().numpy()
-            log_foot_x.append(foot_pos[0])
-            log_foot_y.append(foot_pos[1])
-            log_foot_z.append(foot_pos[2])
+            foot_pos1 = env.rigid_body_states[robot_idx, foot_idx1, 0:3].cpu().numpy()
+            log_foot_x.append(foot_pos1[0])
+            log_foot_y.append(foot_pos1[1])
+            log_foot_z1.append(foot_pos1[2])
+            log_foot_z2.append(env.rigid_body_states[robot_idx, foot_idx2, 2].cpu().numpy())
+            log_foot_z3.append(env.rigid_body_states[robot_idx, foot_idx3, 2].cpu().numpy())
+            log_foot_z4.append(env.rigid_body_states[robot_idx, foot_idx4, 2].cpu().numpy())
 
             current_cot_val = env.current_cot[0].item() 
             print(f"Step {i}: COT = {current_cot_val:.4f}")
@@ -178,14 +185,16 @@ def play(args):
     
         axs[3].plot(time_axis, log_foot_x, 'r', label='Foot X')
         axs[3].plot(time_axis, log_foot_y, 'g', label='Foot Y')
-        axs[3].plot(time_axis, log_foot_z, 'b', label='Foot Z')
         axs[3].set_title('Global Position of Individual Foot')
         axs[3].set_xlabel('Time (s)')
         axs[3].set_ylabel('Position (m)')
         axs[3].legend(loc='upper right')
         axs[3].grid(True)
         
-        axs[4].plot(time_axis, log_foot_z, 'b', label='Foot Z')
+        axs[4].plot(time_axis, log_foot_z1, 'r', label='Foot Z1')
+        axs[4].plot(time_axis, log_foot_z2, 'g', label='Foot Z2')
+        axs[4].plot(time_axis, log_foot_z3, 'b', label='Foot Z3')
+        axs[4].plot(time_axis, log_foot_z4, 'y', label='Foot Z4')
         axs[4].set_title('Global Position of Individual Foot')
         axs[4].set_xlabel('Time (s)')
         axs[4].set_ylabel('Position (m)')
@@ -200,7 +209,22 @@ def play(args):
         axs[5].grid(True)
 
         plt.tight_layout()
-        plt.show()
+        if args.plot:
+            experiment_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)     
+            model_path = get_load_path(root=experiment_root, 
+                                    load_run=args.load_run, 
+                                    checkpoint=args.checkpoint)
+            experiment_dir = os.path.dirname(model_path) 
+            plots_dir = os.path.join(experiment_dir, 'plots')
+            os.makedirs(plots_dir, exist_ok=True)
+            timestamp_plot = datetime.now().strftime('%b%d_%H-%M-%S')
+            plot_path = os.path.join(plots_dir, f"{timestamp_plot}_eval_plots.png")
+            plt.savefig(plot_path, dpi=300) 
+            print(f"Plots saved in : {plot_path}")
+        
+        plt.show() 
+        
+
     else:
         print("No data collected.")
 
