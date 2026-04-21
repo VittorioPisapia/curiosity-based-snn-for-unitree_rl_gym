@@ -68,7 +68,7 @@ class OnPolicyRunner:
 
         self.rnd_obs = []
         self.rnd_running_std = torch.tensor(1.0, device=self.device)
-        self.intrinsic_coeff = self.policy_cfg.get("rnd_intrinsic_coeff", 0.005)
+        self.rnd_insic_coeff = self.policy_cfg.get("rnd_intrinsic_coeff", 0.005)
         self.rnd_reward_clamp = self.policy_cfg.get("rnd_reward_clamp", 0.05)
 
         if self.env.num_privileged_obs is not None:
@@ -84,8 +84,10 @@ class OnPolicyRunner:
         self.alg: PPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
+
         self.icm = ICM(env.num_obs, env.num_actions, hidden_dimension=128, activation="relu").to(self.device)
         self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-4)
+
         self.rnd = RND(env.num_obs, feature_dimension=64, hidden_dimension=128, activation="relu").to(self.device)
         self.rnd_optimizer = torch.optim.Adam(self.rnd.predictor_model.parameters(), lr=1e-4)
 
@@ -134,7 +136,8 @@ class OnPolicyRunner:
                     prev_obs = obs.clone()
                     actions = self.alg.act(obs, critic_obs)
 
-                    prev_action = torch.tanh(actions)
+                    clip_actions = self.env.cfg.normalization.clip_actions
+                    prev_action = torch.clamp(actions, -clip_actions, clip_actions)
 
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
                     critic_obs = privileged_obs if privileged_obs is not None else obs
@@ -148,7 +151,8 @@ class OnPolicyRunner:
                     encoded_next = self.icm.compute_encoded(obs)
                     forward_value = self.icm.compute_forward(encoded_prev, prev_action)
 
-                    intrinsic_reward = ((encoded_next - forward_value) ** 2).mean(dim=-1)
+                    #ntrinsic_reward = ((encoded_next - forward_value) ** 2).mean(dim=-1)
+                    intrinsic_reward = ((encoded_next.detach() - forward_value) ** 2).mean(dim=-1)
 
                     current_std = intrinsic_reward.std()
                     self.running_std = 0.9 * self.running_std + 0.1 * current_std
@@ -161,7 +165,7 @@ class OnPolicyRunner:
 
                     self.icm_obs.append(prev_obs.detach())
                     self.icm_next_obs.append(obs.detach())
-                    self.icm_actions.append(actions.detach())
+                    self.icm_actions.append(prev_action.detach())
 
                     extrinsic_sum += rewards.mean().item()
                     intrinsic_sum += intrinsic_reward.mean().item()
@@ -193,7 +197,7 @@ class OnPolicyRunner:
 
             obs_batch = torch.cat(self.icm_obs, dim=0)
             next_obs_batch = torch.cat(self.icm_next_obs, dim=0)
-            actions_batch = torch.tanh(torch.cat(self.icm_actions, dim=0))
+            actions_batch = torch.clamp(torch.cat(self.icm_actions, dim=0), -clip_actions, clip_actions)
 
             encoded_obs_batch = self.icm.compute_encoded(obs_batch)
             encoded_next_obs_batch = self.icm.compute_encoded(next_obs_batch).detach() 
