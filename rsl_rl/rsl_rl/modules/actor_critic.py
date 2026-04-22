@@ -156,11 +156,18 @@ class ActorCriticSNN(nn.Module):
         self.hidden_states = None
         mlp_input_dim_a = num_actor_obs
         mlp_input_dim_c = num_critic_obs
-        snn_neuron_type = kwargs.get('neuron_type', 'Gaussian')
+        snn_cfg = kwargs.get('snn', {})
+        snn_neuron_type = snn_cfg.get('neuron_type', 'Gaussian')
+        threshold_init = snn_cfg.get('snn_threshold', 0.3)
+        lens = snn_cfg.get('snn_lens', 0.3)
 
         print(f"SNN configured with {snn_neuron_type} neurons")
 
-        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda", neuron_type=snn_neuron_type)
+        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda", threshold_init=threshold_init, lens=lens, neuron_type=snn_neuron_type)
+        self.st = kwargs.get('snn_st', 1)
+        
+        print(f"Initialized ActorCritic with SNN actor, st={self.st}, snn_threshold={threshold_init}, snn_lens={lens}")
+
 
        # Value function
         critic_layers = []

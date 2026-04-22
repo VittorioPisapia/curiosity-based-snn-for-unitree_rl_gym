@@ -3,14 +3,7 @@ from .go2_snn_config import GO2RoughSNNCfgPPO
 class GO2RoughICMCfgPPO( GO2RoughSNNCfgPPO):
 
     runner_class_name = "IcmRunner"
-    class policy:
-
-        class snn:
-            snn_threshold = 0.3
-            snn_lens = 0.3
-            snn_st = 1
-            neuron_type = "Gaussian"
-
+    class policy ( GO2RoughSNNCfgPPO.policy ):
         class icm:
             icm_beta = 0.3
             icm_intrinsic_coeff = 0.02

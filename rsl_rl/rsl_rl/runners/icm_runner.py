@@ -23,25 +23,32 @@ class IcmRunner ( SnnRunner ):
         self.cfg=train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
         self.policy_cfg = train_cfg["policy"]
+        self.icm_cfg = self.policy_cfg["icm"]
         self.device = device
         self.env = env
 
-        self.use_icm = self.policy_cfg.get("use_icm", True)
-        self.use_rnd = self.policy_cfg.get("use_rnd", False)
+        self.use_icm = self.icm_cfg.get("use_icm", True)
+        self.use_rnd = self.icm_cfg.get("use_rnd", False)
 
-        self.beta = self.policy_cfg.get("icm_beta", 1)
-        self.intrinsic_coeff = self.policy_cfg.get("icm_intrinsic_coeff", 0.01)
-        self.icm_reward_clamp = self.policy_cfg.get("icm_reward_clamp", 0.05)
-        self.running_std = torch.tensor(1.0, device=self.device)
+        if self.use_icm:
+            self.beta = self.icm_cfg.get("icm_beta", 1)
+            self.icm_intrinsic_coeff = self.icm_cfg.get("icm_intrinsic_coeff", 0.01)
+            self.icm_reward_clamp = self.icm_cfg.get("icm_reward_clamp", 0.05)
+            self.running_std = torch.tensor(1.0, device=self.device)
+
+            print(f"Running RND module with beta={self.beta}, icm_intrinsic_coeff={self.icm_intrinsic_coeff}, icm_reward_clamp={self.icm_reward_clamp}")
 
         self.icm_obs = []
         self.icm_next_obs = []
         self.icm_actions = []
 
-        self.rnd_obs = []
-        self.rnd_running_std = torch.tensor(1.0, device=self.device)
-        self.rnd_intrinsic_coeff = self.policy_cfg.get("rnd_intrinsic_coeff", 0.005)
-        self.rnd_reward_clamp = self.policy_cfg.get("rnd_reward_clamp", 0.05)
+        if self.use_rnd:
+            self.rnd_obs = []
+            self.rnd_running_std = torch.tensor(1.0, device=self.device)
+            self.rnd_intrinsic_coeff = self.icm_cfg.get("rnd_intrinsic_coeff", 0.005)
+            self.rnd_reward_clamp = self.icm_cfg.get("rnd_reward_clamp", 0.05)
+
+            print(f"Running ICM with rnd_intrinsic_coeff={self.rnd_intrinsic_coeff}, rnd_reward_clamp={self.rnd_reward_clamp}")
 
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
@@ -155,7 +162,7 @@ class IcmRunner ( SnnRunner ):
                     total_reward = rewards.clone()
 
                     if self.use_icm:
-                        total_reward += self.intrinsic_coeff * intrinsic_reward
+                        total_reward += self.icm_intrinsic_coeff * intrinsic_reward
 
                     if self.use_rnd:
                         total_reward += self.rnd_intrinsic_coeff * rnd_reward
@@ -199,7 +206,7 @@ class IcmRunner ( SnnRunner ):
                 start = stop
 
             if self.use_icm:
-                self.intrinsic_coeff = max(0.001, self.intrinsic_coeff * 0.999)
+                self.icm_intrinsic_coeff = max(0.001, self.icm_intrinsic_coeff * 0.999)
             if self.use_rnd:
                 self.rnd_intrinsic_coeff = max(0.001, self.rnd_intrinsic_coeff * 0.999)
 
@@ -254,7 +261,7 @@ class IcmRunner ( SnnRunner ):
                     self.writer.add_scalar("Reward/icm", intrinsic_sum / count, it)
                     self.writer.add_scalar(
                                 "Reward/intrinsic_scaled",
-                                self.intrinsic_coeff * (intrinsic_sum / count),
+                                self.icm_intrinsic_coeff * (intrinsic_sum / count),
                                 it
                             )
             stop = time.time()
