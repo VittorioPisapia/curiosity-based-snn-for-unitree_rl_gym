@@ -131,12 +131,11 @@ class IcmRunner ( SnnRunner ):
                     obs = obs.to(self.device)
                     
                     if self.use_icm:
-                    # ICM forward
                         encoded_prev = self.icm.compute_encoded(prev_obs)
                         encoded_next = self.icm.compute_encoded(obs)
                         forward_value = self.icm.compute_forward(encoded_prev, prev_action)
 
-                        #ntrinsic_reward = ((encoded_next - forward_value) ** 2).mean(dim=-1)
+                        #intrinsic_reward = ((encoded_next - forward_value) ** 2).mean(dim=-1)
                         intrinsic_reward = ((encoded_next.detach() - forward_value) ** 2).mean(dim=-1)
 
                         current_std_icm = intrinsic_reward.std()
@@ -146,7 +145,6 @@ class IcmRunner ( SnnRunner ):
                         intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, self.icm_reward_clamp)
 
                     if self.use_rnd:
-                    # RND TODO
                         rnd_target = self.rnd.target_model(obs).detach()
                         rnd_pred = self.rnd.predictor_model(obs)
 
