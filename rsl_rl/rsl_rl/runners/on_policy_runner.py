@@ -133,8 +133,8 @@ class OnPolicyRunner:
             start = time.time()
             extrinsic_sum = 0.0
             intrinsic_sum = 0.0
-            count = 0
             rnd_sum = 0.0
+            count = 0
             intrinsic_reward = torch.zeros(self.env.num_envs, device=self.device)
             rnd_reward = torch.zeros(self.env.num_envs, device=self.device)
             # Rollout
@@ -155,7 +155,8 @@ class OnPolicyRunner:
                     obs = obs.to(self.device)
                     
                     if self.use_icm:
-                    # ICM forward
+
+                        # ICM forward
                         encoded_prev = self.icm.compute_encoded(prev_obs)
                         encoded_next = self.icm.compute_encoded(obs)
                         forward_value = self.icm.compute_forward(encoded_prev, prev_action)
@@ -170,7 +171,8 @@ class OnPolicyRunner:
                         intrinsic_reward = torch.clamp(intrinsic_reward, 0.0, self.icm_reward_clamp)
 
                     if self.use_rnd:
-                    # RND TODO
+
+                        # RND 
                         rnd_target = self.rnd.target_model(obs).detach()
                         rnd_pred = self.rnd.predictor_model(obs)
 
@@ -202,7 +204,6 @@ class OnPolicyRunner:
 
                     extrinsic_sum += rewards.mean().item()
                     
-                    
                     if self.use_icm:
                         intrinsic_sum += intrinsic_reward.mean().item()
                     if self.use_rnd:
@@ -222,7 +223,6 @@ class OnPolicyRunner:
                         cur_reward_sum[new_ids] = 0
                         cur_episode_length[new_ids] = 0
 
-
                 stop = time.time()
                 collection_time = stop - start
 
@@ -239,6 +239,7 @@ class OnPolicyRunner:
             mean_value_loss, mean_surrogate_loss = self.alg.update()
 
             if self.use_icm:
+
                 obs_batch = torch.cat(self.icm_obs, dim=0)
                 next_obs_batch = torch.cat(self.icm_next_obs, dim=0)
                 actions_batch = torch.clamp(torch.cat(self.icm_actions, dim=0), -clip_actions, clip_actions)
@@ -253,6 +254,7 @@ class OnPolicyRunner:
                 inverse_loss = ((pred_action - actions_batch)**2).mean()
 
                 icm_loss = forward_loss + self.beta * inverse_loss
+
                 # icm update
                 self.icm_optimizer.zero_grad()
                 icm_loss.backward()
