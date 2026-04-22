@@ -2,7 +2,7 @@ from .go2_snn_config import GO2RoughSNNCfgPPO
 
 class GO2RoughICMCfgPPO( GO2RoughSNNCfgPPO):
 
-    runner_class_name = "SnnRunner"
+    runner_class_name = "IcmRunner"
     class policy:
 
         class snn:
@@ -20,6 +20,5 @@ class GO2RoughICMCfgPPO( GO2RoughSNNCfgPPO):
             rnd_intrinsic_coeff = 0.007
             rnd_reward_clamp = 0.05
 
-        class runner:
-            policy_class_name = "ActorCriticSnn"
-            experiment_name = "rough_go2_snn"
+    class runner ( GO2RoughSNNCfgPPO.runner ):
+        experiment_name = "rough_go2_icm"

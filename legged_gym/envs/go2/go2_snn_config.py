@@ -3,7 +3,7 @@ from .go2_config import GO2RoughCfg, GO2RoughCfgPPO
 class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
 
     runner_class_name = "SnnRunner"
-    class policy:
+    class policy ( GO2RoughCfgPPO.policy ):
 
         class snn:
 
@@ -12,8 +12,9 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
             snn_st = 1
             neuron_type = "Gaussian"
 
-        class runner:
-            policy_class_name = "ActorCriticSNN"
-            experiment_name = "rough_go2_snn"
+    class runner ( GO2RoughCfgPPO.runner ):
+        policy_class_name = "ActorCriticSNN"
+        experiment_name = "rough_go2_snn"
+        algorithm_class_name = 'PPO_Snn'
 
         

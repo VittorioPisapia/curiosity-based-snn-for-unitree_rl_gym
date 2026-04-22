@@ -1,8 +1,8 @@
 from legged_gym import LEGGED_GYM_ROOT_DIR, LEGGED_GYM_ENVS_DIR
 
 from legged_gym.envs.go2.go2_config import GO2RoughCfg, GO2RoughCfgPPO
-from legged_gym.envs.go2.go2_snn_config import GO2RoughCfg, GO2RoughSNNCfgPPO
-from legged_gym.envs.go2.go2_icm_config import GO2RoughCfg, GO2RoughICMCfgPPO
+from legged_gym.envs.go2.go2_snn_config import GO2RoughSNNCfgPPO
+from legged_gym.envs.go2.go2_icm_config import GO2RoughICMCfgPPO
 from legged_gym.envs.h1.h1_config import H1RoughCfg, H1RoughCfgPPO
 from legged_gym.envs.h1.h1_env import H1Robot
 from legged_gym.envs.h1_2.h1_2_config import H1_2RoughCfg, H1_2RoughCfgPPO

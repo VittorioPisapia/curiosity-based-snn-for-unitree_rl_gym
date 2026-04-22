@@ -149,7 +149,7 @@ class ActorCriticSNN(nn.Module):
                         **kwargs):
         if kwargs:
             print("ActorCritic.__init__ got unexpected arguments, which will be ignored: " + str([key for key in kwargs.keys()]))
-        super(ActorCritic, self).__init__()
+        super().__init__()
 
         activation = get_activation(activation)
 
@@ -157,6 +157,8 @@ class ActorCriticSNN(nn.Module):
         mlp_input_dim_a = num_actor_obs
         mlp_input_dim_c = num_critic_obs
         snn_neuron_type = kwargs.get('neuron_type', 'Gaussian')
+
+        print(f"SNN configured with {snn_neuron_type} neurons")
 
         self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda", neuron_type=snn_neuron_type)
 

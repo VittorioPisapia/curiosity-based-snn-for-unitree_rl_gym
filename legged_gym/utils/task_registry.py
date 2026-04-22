@@ -115,7 +115,26 @@ class TaskRegistry():
             log_dir = os.path.join(log_root, datetime.now().strftime('%b%d_%H-%M-%S') + '_' + train_cfg.runner.run_name)
         
         train_cfg_dict = class_to_dict(train_cfg)
-        runner = OnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+
+        runner_class_name = getattr(train_cfg, 'runner_class_name')
+        print(f"Loading runner named: {runner_class_name}")
+
+        # 2. Instantiate the correct runner based on the name
+        if runner_class_name == 'OnPolicyRunner':
+            runner = OnPolicyRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+            
+        elif runner_class_name == 'SnnRunner':
+            from rsl_rl.runners.snn_runner import SnnRunner 
+            runner = SnnRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+            
+        elif runner_class_name == 'IcmRunner': 
+            print("ONTI---------------------------------------")
+            from rsl_rl.runners.icm_runner import IcmRunner 
+            runner = IcmRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+            
+        else:
+            raise ValueError(f"Unknown runner class: {runner_class_name}. Please check your config file!")
+        
         #save resume path before creating a new log_dir
         resume = train_cfg.runner.resume
         if resume:
