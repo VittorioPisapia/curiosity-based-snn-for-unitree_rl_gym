@@ -59,4 +59,6 @@ class GO2RoughCfgPPO( LeggedRobotCfgPPO ):
         run_name = ''
         experiment_name = 'rough_go2'
 
+
+
   

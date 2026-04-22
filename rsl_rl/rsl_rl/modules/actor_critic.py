@@ -135,6 +135,122 @@ class ActorCritic(nn.Module):
         value = self.critic(critic_observations)
         return value
 
+from .snn import SNN
+
+class ActorCriticSNN(nn.Module):
+    is_recurrent = False
+    def __init__(self,  num_actor_obs,
+                        num_critic_obs,
+                        num_actions,
+                        actor_hidden_dims=[256, 256, 256],
+                        critic_hidden_dims=[256, 256, 256],
+                        activation='elu',
+                        init_noise_std=1.0,
+                        **kwargs):
+        if kwargs:
+            print("ActorCritic.__init__ got unexpected arguments, which will be ignored: " + str([key for key in kwargs.keys()]))
+        super(ActorCritic, self).__init__()
+
+        activation = get_activation(activation)
+
+        self.hidden_states = None
+        mlp_input_dim_a = num_actor_obs
+        mlp_input_dim_c = num_critic_obs
+        snn_neuron_type = kwargs.get('neuron_type', 'Gaussian')
+
+        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda", neuron_type=snn_neuron_type)
+
+       # Value function
+        critic_layers = []
+        critic_layers.append(nn.Linear(mlp_input_dim_c, critic_hidden_dims[0]))
+        critic_layers.append(activation)
+        for l in range(len(critic_hidden_dims)):
+            if l == len(critic_hidden_dims) - 1:
+                critic_layers.append(nn.Linear(critic_hidden_dims[l], 1))
+            else:
+                critic_layers.append(nn.Linear(critic_hidden_dims[l], critic_hidden_dims[l + 1]))
+                critic_layers.append(activation)
+                
+        self.critic = nn.Sequential(*critic_layers)
+
+        print(f"Actor MLP: {self.actor}")
+        print(f"Critic MLP: {self.critic}")
+
+        # Action noise
+        self.std = nn.Parameter(init_noise_std * torch.ones(num_actions))
+        self.distribution = None
+        # disable args validation for speedup
+        Normal.set_default_validate_args = False
+        
+        # seems that we get better performance without init
+        # self.init_memory_weights(self.memory_a, 0.001, 0.)
+        # self.init_memory_weights(self.memory_c, 0.001, 0.)
+
+    @staticmethod
+    # not used at the moment
+    def init_weights(sequential, scales):
+        [torch.nn.init.orthogonal_(module.weight, gain=scales[idx]) for idx, module in
+         enumerate(mod for mod in sequential if isinstance(mod, nn.Linear))]
+
+
+    def reset(self, dones=None):
+        if self.hidden_states is None:
+            return
+        if dones is None:
+            return
+
+        done_ids = dones.view(-1).nonzero(as_tuple=False).squeeze(-1)
+        if done_ids.numel() > 0:
+            self.hidden_states["snn_m"][done_ids] = 0.0
+            self.hidden_states["snn_s"][done_ids] = 0.0
+
+    def forward(self):
+        raise NotImplementedError
+    
+    @property
+    def action_mean(self):
+        return self.distribution.mean
+
+    @property
+    def action_std(self):
+        return self.distribution.stddev
+    
+    @property
+    def entropy(self):
+        return self.distribution.entropy().sum(dim=-1)
+
+    def update_distribution(self, observations, hidden_states=None):
+        mean, _ = self.actor(observations, hidden_states=hidden_states)
+        self.distribution = Normal(mean, self.std.expand_as(mean))
+
+    def act(self, observations, **kwargs):
+        mean, next_hidden_states = self.actor(observations, hidden_states=self.hidden_states)
+        self.distribution = Normal(mean, self.std.expand_as(mean))
+
+        self.hidden_states = {
+            "snn_m": next_hidden_states["snn_m"].detach(),
+            "snn_s": next_hidden_states["snn_s"].detach()
+        }
+
+        return self.distribution.sample()
+    
+    def get_actions_log_prob(self, actions):
+        return self.distribution.log_prob(actions).sum(dim=-1)
+
+    def act_inference(self, observations):
+        actions_mean, next_hidden_states = self.actor(observations, hidden_states=self.hidden_states)
+
+        self.hidden_states = {
+            "snn_m" : next_hidden_states["snn_m"].detach(),
+            "snn_s" : next_hidden_states["snn_s"].detach()
+        }
+
+        return actions_mean
+
+    def evaluate(self, critic_observations, **kwargs):
+        value = self.critic(critic_observations)
+        return value
+
 def get_activation(act_name):
     if act_name == "elu":
         return nn.ELU()

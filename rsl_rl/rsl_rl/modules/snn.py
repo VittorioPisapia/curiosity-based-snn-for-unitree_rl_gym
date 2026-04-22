@@ -2,12 +2,11 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-from torch.distributions import Normal
-from torch.nn.modules import rnn
+import torch.nn.functional as F
 import math
 from typing import List, Dict, Union, Any, Tuple
 from abc import abstractmethod
-import torch.nn.functional as F
+
 
 class Neurons(nn.Module):
     def __init__(
@@ -72,19 +71,72 @@ class LIFGaussian(Neurons):
 
         self._set_hidden_states(hidden_states, (batch_sz, layer_sz))
 
+        # SOFT RESET  #TODO: try soft-reset of the membrane potential, i.e. reset to v - thresh instead of 0
+
+        # v_prev = self.hidden_states_tensors["snn_m"] 
+        # if spiking_neurons:
+        #     v_prev = v_prev * -(self.hidden_states_tensors["snn_s"]*thresholds)
+        # decayed_m = v_prev * decays
+        # output["snn_m"] = decayed_m + x
+            
         spikes_reset = 1  # if 0 the previous v mem is reset
         if spiking_neurons:
-            #spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
+            spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
 
-            spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])
+            #spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])   # Partial reset
         
         output["snn_m"] = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
         if spiking_neurons:
             output["snn_s"] = self.spike_function(output["snn_m"], thresholds, self.lens)
         return output
+    
+class SpikeFunctionBPTT(torch.autograd.Function):
+    @staticmethod
+    def forward(ctx, v_scaled, gamma):
+        ctx.save_for_backward(v_scaled)
+        ctx.gamma = gamma
+        z_ = torch.gt(v_scaled, 0.)
+        z_ = z_.type(torch.float)
+        return z_
+    
+    @staticmethod
+    def backward(ctx, grad_output):
+        v_scaled, = ctx.saved_tensors
+        gamma = ctx.gamma
+        zeros = torch.zeros_like(v_scaled, device=v_scaled.device)
+        return torch.maximum(1 - torch.abs(v_scaled), zeros) * gamma * grad_output, None
+
+
+class LIF_BPTT(Neurons):
+    def __init__(
+            self,
+            #decay: float,
+            #threshold: float,
+            device: Union[str, torch.device],
+            **kwards,
+        ) -> None:
+        super().__init__(["snn_s", "snn_m"], SpikeFunctionBPTT, device)
+
+    def forward(self, x, thresholds, decays, hidden_states, spiking_neurons):
+        output = {}
+        batch_sz, layer_sz = x.shape[0], x.shape[1]
+
+        self._set_hidden_states(hidden_states, (batch_sz, layer_sz))
+
+        spikes_reset = 1  # if 0 the previous v mem is reset
+        if spiking_neurons:
+            spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
+        
+        output["snn_m"] = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
+        if spiking_neurons:
+            output["snn_s"] = self.spike_function(
+                output["snn_m"] - thresholds / thresholds, .3
+            )
+        return output
+
 
 class SNN(nn.Module):
-    def __init__(self, input_dim, hidden_dim, output_dim, device):
+    def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.5, lens=0.3, neuron_type="Gaussian"):
         super().__init__()
 
         self.device = torch.device(device) if isinstance(device, str) else device
@@ -94,13 +146,18 @@ class SNN(nn.Module):
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, output_dim)
 
-        self.fs = LIFGaussian(lens=0.3, device=self.device)
+        if neuron_type == "Gaussian":
+            self.fs = LIFGaussian(lens=lens, device=self.device)
+        elif neuron_type == "BPTT":
+            self.fs = LIF_BPTT(device=self.device)
+        else:
+            raise ValueError(f"Unsupported neuron type: {neuron_type}")
 
         self.spike_dim = 2 * hidden_dim
         self.mem_dim = 2 * hidden_dim
 
         self.thresholds = nn.Parameter(
-            torch.full((self.spike_dim,), 0.3, device=self.device)
+            torch.full((self.spike_dim,), threshold_init, device=self.device) 
         )
         self.decays_raw = nn.Parameter(
             torch.full((self.mem_dim,), -0.5, device=self.device)
@@ -149,7 +206,7 @@ class SNN(nn.Module):
             }
 
         for _ in range(st):
-            z1 = self.fc1(obs*1.5)
+            z1 = self.fc1(obs*1.5) 
             h1 = self._neurons_forward(z1, current_state, 0, self.hidden_dim, True)
 
             z2 = self.fc2(h1["snn_s"])
