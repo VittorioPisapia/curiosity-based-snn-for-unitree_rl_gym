@@ -22,7 +22,8 @@ def play(args):
     
     
     # override some parameters for testing
-    env_cfg.seed = args.seed
+    if args.seed is not None:
+        env_cfg.seed = args.seed
     env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
