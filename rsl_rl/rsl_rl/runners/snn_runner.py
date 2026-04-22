@@ -7,7 +7,7 @@ import torch
 
 from .on_policy_runner import OnPolicyRunner
 from rsl_rl.modules.actor_critic import ActorCriticSNN
-from rsl_rl.algorithms import PPO
+from rsl_rl.algorithms.ppo_snn import PPO_Snn
 from rsl_rl.env import VecEnv
 from torch.utils.tensorboard import SummaryWriter
 
@@ -33,7 +33,7 @@ class SnnRunner ( OnPolicyRunner ):
                                                         self.env.num_actions,
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
-        self.alg: PPO = alg_class(actor_critic, device=self.device, **self.alg_cfg)
+        self.alg: PPO_Snn = alg_class(actor_critic, device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
 
