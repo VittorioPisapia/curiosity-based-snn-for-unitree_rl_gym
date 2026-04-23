@@ -158,7 +158,7 @@ class ActorCriticSNN(nn.Module):
         mlp_input_dim_c = num_critic_obs
         snn_cfg = kwargs.get('snn', {})
         snn_neuron_type = snn_cfg.get('neuron_type', 'Gaussian')
-        threshold_init = snn_cfg.get('snn_threshold', 0.3)
+        threshold_init = snn_cfg.get('snn_threshold', 0.5)
         lens = snn_cfg.get('snn_lens', 0.3)
 
         print(f"SNN configured with {snn_neuron_type} neurons")

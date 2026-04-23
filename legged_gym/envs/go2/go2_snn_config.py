@@ -5,7 +5,7 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
     runner_class_name = "SnnRunner"
     class policy ( GO2RoughCfgPPO.policy ):
         class snn:
-            snn_threshold = 0.3
+            snn_threshold = 0.5
             snn_lens = 0.3
             snn_st = 1
             neuron_type = "Gaussian" # Gaussian, BPTT
