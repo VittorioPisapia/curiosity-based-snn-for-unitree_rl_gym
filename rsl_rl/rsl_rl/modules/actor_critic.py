@@ -160,14 +160,15 @@ class ActorCriticSNN(nn.Module):
         snn_neuron_type = snn_cfg.get('neuron_type', 'Gaussian')
         threshold_init = snn_cfg.get('snn_threshold', 0.5)
         lens = snn_cfg.get('snn_lens', 0.3)
+        num_neurons = snn_cfg.get('num_neurons', 256)
+        st = kwargs.get('snn_st', 1)
 
-        print(f"SNN configured with {snn_neuron_type} neurons")
+        self.actor = SNN(mlp_input_dim_a, num_neurons, num_actions, device="cuda", threshold_init=threshold_init, lens=lens, neuron_type=snn_neuron_type)
 
-        self.actor = SNN(mlp_input_dim_a, 256, num_actions, device="cuda", threshold_init=threshold_init, lens=lens, neuron_type=snn_neuron_type)
-        self.st = kwargs.get('snn_st', 1)
-        
-        print(f"Initialized ActorCritic with SNN actor, st={self.st}, snn_threshold={threshold_init}, snn_lens={lens}")
-
+        print('------------------------------------------------------------')
+        print(f"SNN configured with {num_neurons} {snn_neuron_type} neurons")
+        print(f"Initialized ActorCriticSNN with st={st}, snn_threshold={threshold_init}, snn_lens={lens}")
+        print('------------------------------------------------------------')     
 
        # Value function
         critic_layers = []

@@ -2,7 +2,7 @@ import numpy as np
 
 import torch
 import torch.nn as nn
-import torch.nn.functional as F
+import torch.nn.functional as F 
 import math
 from typing import List, Dict, Union, Any, Tuple
 from abc import abstractmethod
@@ -142,6 +142,8 @@ class SNN(nn.Module):
         self.device = torch.device(device) if isinstance(device, str) else device
         self.hidden_dim = hidden_dim
 
+        self.input_norm = nn.LayerNorm(input_dim)
+
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
         self.fc3 = nn.Linear(hidden_dim, output_dim)
@@ -191,6 +193,8 @@ class SNN(nn.Module):
 
     def forward(self, obs, hidden_states, st=1):
         obs = obs.to(self.device)
+        obs = self.input_norm(obs)
+
         batch_size = obs.shape[0]
         st = int(st)
 
@@ -206,7 +210,7 @@ class SNN(nn.Module):
             }
 
         for _ in range(st):
-            z1 = self.fc1(obs*1.5) 
+            z1 = self.fc1(obs) 
             h1 = self._neurons_forward(z1, current_state, 0, self.hidden_dim, True)
 
             z2 = self.fc2(h1["snn_s"])
