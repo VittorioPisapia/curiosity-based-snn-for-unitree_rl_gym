@@ -269,10 +269,12 @@ class IcmRunner ( SnnRunner ):
             if it % self.save_interval == 0:
                 self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(it)))
             ep_infos.clear()
-            self.icm_obs.clear()
-            self.icm_next_obs.clear()
-            self.icm_actions.clear()
-            self.rnd_obs.clear()
+            if self.use_icm:
+                self.icm_obs.clear()
+                self.icm_next_obs.clear()
+                self.icm_actions.clear()
+            if self.use_rnd:
+                self.rnd_obs.clear()
         
         self.current_learning_iteration += num_learning_iterations
         self.save(os.path.join(self.log_dir, 'model_{}.pt'.format(self.current_learning_iteration)))
