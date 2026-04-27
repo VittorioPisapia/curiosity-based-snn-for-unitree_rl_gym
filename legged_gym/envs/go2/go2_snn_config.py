@@ -9,7 +9,7 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
             snn_lens = 0.3 # 0.3 Gaussian width
             snn_st = 1  # 1
             neuron_type = "Gaussian" # Gaussian, BPTT
-            num_neurons = 384 # 256, 384, 512 try
+            num_neurons = 384 # 256, 384, 512
 
     class runner ( GO2RoughCfgPPO.runner ):
         policy_class_name = "ActorCriticSNN"
