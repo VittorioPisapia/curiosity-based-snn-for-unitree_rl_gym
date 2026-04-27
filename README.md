@@ -1,17 +1,25 @@
 <div align="center">
-  <h1 align="center">Curiosity killed the cat or made it more efficient?</h1>
+  <h1 align="center">Spiking Neural Networks and Intrinsic Curiosity in Unitree RL Gym</h1>
   <p align="center">
+    Exploring biologically inspired learning for legged robot control
   </p>
 </div>
 
-I am a master student from Sapienza, Universty of Rome currently researching about SNN at the NeuroRobotics Lab. of Tohoku University. 
-> **⚠️ WORK IN PROGRESS FORK ⚠️**
->
-> This repository is a fork of the original Unitree RL GYM. It is currently a **Work In Progress (WIP)** and introduces an implementation of **Spiking Neural Networks (SNN)** and the **Intrinsic Curiosity Module (ICM)**.
->
-> *Note: The Chinese translation (`README_zh.md`) is currently out of date and does not reflect these new modifications.*
-
 ---
+
+This repository is a **Work-In-Progress (WIP) fork** of the original Unitree RL Gym, extending it with:
+
+- 🧠 **Spiking Neural Networks (SNN)** for energy-efficient and biologically plausible control  
+- 🔍 **Intrinsic Curiosity Module (ICM)** for improved exploration in reinforcement learning  
+
+The goal is to investigate whether **curiosity-driven learning and event-based neural computation** can improve efficiency and adaptability in legged locomotion tasks.
+
+This work is developed as part of a research project at the NeuroRobotics Lab, Tohoku University.
+
+> ⚠️ **WIP Notice**
+> - Some features are experimental and may be unstable  
+> - Documentation is incomplete and being actively updated  
+> - Chinese documentation (`README_zh.md`) is currently outdated  
 
 ---
 
