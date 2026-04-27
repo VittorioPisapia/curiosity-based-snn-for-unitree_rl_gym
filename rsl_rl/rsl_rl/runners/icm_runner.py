@@ -223,7 +223,7 @@ class IcmRunner ( SnnRunner ):
                 
                 
    
-                batch_size = dataset_size // self.num_mini_batches
+                batch_size = dataset_size // self.icm_num_mini_batches
 
                 mean_forward_loss = 0.0
                 mean_inverse_loss = 0.0
