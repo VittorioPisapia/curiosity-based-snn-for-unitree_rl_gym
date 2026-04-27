@@ -19,7 +19,8 @@ This work is developed as part of a research project at the NeuroRobotics Lab, T
 > ⚠️ **WIP Notice**
 > - Some features are experimental and may be unstable  
 > - Documentation is incomplete and being actively updated  
-> - Chinese documentation (`README_zh.md`) is currently outdated  
+> - Chinese documentation (`README_zh.md`) and set up tutorial (`setup.md`) are currently outdated
+>    
 
 ---
 
