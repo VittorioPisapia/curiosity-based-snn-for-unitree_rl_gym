@@ -11,10 +11,6 @@ I am a master student from Sapienza, Universty of Rome currently researching abo
 >
 > *Note: The Chinese translation (`README_zh.md`) is currently out of date and does not reflect these new modifications.*
 
-<p align="center">
-  <strong>This is a repository for reinforcement learning implementation based on Unitree robots, supporting Unitree Go2, H1, H1_2, and G1.</strong> 
-</p>
-
 ---
 
 ---
