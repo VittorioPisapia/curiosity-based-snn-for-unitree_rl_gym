@@ -18,15 +18,14 @@ This work is developed as part of a research project at the NeuroRobotics Lab, T
 
 > ⚠️ **WIP Notice**
 > - Some features are experimental and may be unstable  
-> - Documentation is incomplete and being actively updated  
-> - Chinese documentation (`README_zh.md`) and set up tutorial (`setup.md`) are currently outdated
->    
+> - Documentation is incomplete and being actively updated
+> - Chinese documentation (`README_zh.md`) and setup tutorial (`setup.md`) are currently outdated
 
 ---
 
 ## 📦 Installation and Configuration
 
-Please refer to [setup.md](/doc/setup_en.md) for installation and configuration steps. (NEED UPDATE)
+Please refer to [setup.md](/doc/setup_en.md) for installation and configuration steps.
 
 ## 🛠️ User Guide
 
