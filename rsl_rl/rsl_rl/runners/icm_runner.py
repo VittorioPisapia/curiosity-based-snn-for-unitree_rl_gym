@@ -34,9 +34,11 @@ class IcmRunner ( SnnRunner ):
             self.beta = self.icm_cfg.get("icm_beta", 1)
             self.icm_intrinsic_coeff = self.icm_cfg.get("icm_intrinsic_coeff", 0.01)
             self.icm_reward_clamp = self.icm_cfg.get("icm_reward_clamp", 0.05)
+            self.icm_epochs = self.icm_cfg.get("icm_epochs", 4)
+            self.icm_num_mini_batches = self.icm_cfg.get("icm_num_mini_batches", 4)
             self.running_std = torch.tensor(1.0, device=self.device)
 
-            print(f"Running RND module with beta={self.beta}, icm_intrinsic_coeff={self.icm_intrinsic_coeff}, icm_reward_clamp={self.icm_reward_clamp}")
+            print(f"Running ICM module with beta={self.beta}, icm_intrinsic_coeff={self.icm_intrinsic_coeff}, icm_reward_clamp={self.icm_reward_clamp}")
 
         self.icm_obs = []
         self.icm_next_obs = []
@@ -48,7 +50,7 @@ class IcmRunner ( SnnRunner ):
             self.rnd_intrinsic_coeff = self.icm_cfg.get("rnd_intrinsic_coeff", 0.005)
             self.rnd_reward_clamp = self.icm_cfg.get("rnd_reward_clamp", 0.05)
 
-            print(f"Running ICM with rnd_intrinsic_coeff={self.rnd_intrinsic_coeff}, rnd_reward_clamp={self.rnd_reward_clamp}")
+            print(f"Running RND with rnd_intrinsic_coeff={self.rnd_intrinsic_coeff}, rnd_reward_clamp={self.rnd_reward_clamp}")
 
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
@@ -217,20 +219,49 @@ class IcmRunner ( SnnRunner ):
                 next_obs_batch = torch.cat(self.icm_next_obs, dim=0)
                 actions_batch = torch.clamp(torch.cat(self.icm_actions, dim=0), -clip_actions, clip_actions)
 
-                encoded_obs_batch = self.icm.compute_encoded(obs_batch)
-                encoded_next_obs_batch = self.icm.compute_encoded(next_obs_batch).detach() 
+                dataset_size = obs_batch.shape[0]
                 
-                pred_next = self.icm.compute_forward(encoded_obs_batch, actions_batch)
-                forward_loss = ((pred_next - encoded_next_obs_batch)**2).mean()
+                
+   
+                batch_size = dataset_size // self.num_mini_batches
 
-                pred_action = self.icm.compute_inverse(encoded_obs_batch, encoded_next_obs_batch)
-                inverse_loss = ((pred_action - actions_batch)**2).mean()
+                mean_forward_loss = 0.0
+                mean_inverse_loss = 0.0
+                update_steps = 0
 
-                icm_loss = forward_loss + self.beta * inverse_loss
-                # icm update
-                self.icm_optimizer.zero_grad()
-                icm_loss.backward()
-                self.icm_optimizer.step()
+                for epoch in range(self.icm_epochs):
+                    indices = torch.randperm(dataset_size, device=self.device)
+                    
+                    for i in range(0, dataset_size, batch_size):
+
+                        idx = indices[i:i + batch_size]
+                        
+                        mb_obs = obs_batch[idx]
+                        mb_next_obs = next_obs_batch[idx]
+                        mb_actions = actions_batch[idx]
+
+                        encoded_obs = self.icm.compute_encoded(mb_obs)
+                        encoded_next_obs = self.icm.compute_encoded(mb_next_obs)
+                        
+
+                        pred_next = self.icm.compute_forward(encoded_obs, mb_actions)
+                        forward_loss = ((pred_next - encoded_next_obs.detach())**2).mean()
+
+                        pred_action = self.icm.compute_inverse(encoded_obs, encoded_next_obs)
+                        inverse_loss = ((pred_action - mb_actions)**2).mean()
+
+                        icm_loss = forward_loss + self.beta * inverse_loss
+
+                        self.icm_optimizer.zero_grad()
+                        icm_loss.backward()
+                        self.icm_optimizer.step()
+
+                        mean_forward_loss += forward_loss.item()
+                        mean_inverse_loss += inverse_loss.item()
+                        update_steps += 1
+
+                final_forward_loss = mean_forward_loss / update_steps
+                final_inverse_loss = mean_inverse_loss / update_steps
 
             if self.use_rnd:
 
@@ -253,8 +284,9 @@ class IcmRunner ( SnnRunner ):
                     self.writer.add_scalar("RND/loss", rnd_loss.item(), it)
 
                 if self.use_icm:
-                    self.writer.add_scalar("ICM/forward_loss", forward_loss.item(), it)
-                    self.writer.add_scalar("ICM/inverse_loss", inverse_loss.item(), it)
+                    self.writer.add_scalar("ICM/forward_loss", final_forward_loss, it)
+                    self.writer.add_scalar("ICM/inverse_loss", final_inverse_loss, it)
+                    
                     self.writer.add_scalar("ICM/std", self.running_std, it)
                     self.writer.add_scalar("Reward/icm", intrinsic_sum / count, it)
                     self.writer.add_scalar(
