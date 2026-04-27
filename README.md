@@ -1,7 +1,7 @@
 <div align="center">
   <h1 align="center">Spiking Neural Networks and Intrinsic Curiosity in Unitree RL Gym</h1>
   <p align="center">
-    /Curiosity killed the cat or made it more efficient?/
+    _Curiosity killed the cat or made it more efficient?_
   </p>
 </div>
 
