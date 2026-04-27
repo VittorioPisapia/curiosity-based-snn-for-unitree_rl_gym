@@ -1,4 +1,4 @@
-# Installation Guide
+# Installation Guide (from https://github.com/unitreerobotics/unitree_rl_gym.git)
 
 ## System Requirements
 
@@ -97,14 +97,14 @@ pip install -e .
 
 There is a missing folder named env, working to fix it
 
-### 2.4 Install unitree_rl_gym
+### 2.4 Install this repository
 
 #### 2.4.1 Download
 
 Clone the repository using Git:
 
 ```bash
-git clone https://github.com/unitreerobotics/unitree_rl_gym.git
+git clone https://github.com/VittorioPisapia/curiosity-based-snn-for-unitree_rl_gym.git
 ```
 
 #### 2.4.2 Install
