@@ -138,6 +138,7 @@ class SnnRunner ( OnPolicyRunner ):
         m1_mean = getattr(actor, "last_m1_mean", float("nan"))
         m2_mean = getattr(actor, "last_m2_mean", float("nan"))
         decay_mean = getattr(actor, "last_decay_mean", float("nan"))
+        threshold_mean = getattr(actor, "last_threshold_mean", float("nan"))
 
         self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
@@ -149,6 +150,7 @@ class SnnRunner ( OnPolicyRunner ):
         self.writer.add_scalar('SNN/m1_mean', self.alg.actor_critic.actor.last_m1_mean, locs['it'])
         self.writer.add_scalar('SNN/m2_mean', self.alg.actor_critic.actor.last_m2_mean, locs['it'])
         self.writer.add_scalar('SNN/decay_mean', self.alg.actor_critic.actor.last_decay_mean, locs['it'])
+        self.writer.add_scalar('SNN/threshold_mean', self.alg.actor_critic.actor.last_threshold_mean, locs['it'])
         if len(locs['rewbuffer']) > 0:
             self.writer.add_scalar('Train/mean_reward', statistics.mean(locs['rewbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
@@ -169,6 +171,7 @@ class SnnRunner ( OnPolicyRunner ):
               f"""{'SNN m1 mean:':>{pad}} {m1_mean:.4f}\n"""
               f"""{'SNN m2 mean:':>{pad}} {m2_mean:.4f}\n"""
               f"""{'SNN decay mean:':>{pad}} {decay_mean:.4f}\n"""
+              f"""{'SNN threshold mean:':>{pad}} {threshold_mean:.4f}\n"""
               f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
               f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n""")
         else:
