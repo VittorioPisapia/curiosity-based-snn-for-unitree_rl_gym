@@ -59,7 +59,7 @@ python legged_gym/scripts/play.py --task=xxx
 
 - Play’s parameters are the same as Train’s except:
 - - `--plot`: Display and save some useful plots during play.py
-- `--record`: Record one environment during play.py
+- - `--record`: Record one environment during play.py
 - By default, it loads the latest model from the experiment folder’s last run.
 - You can specify other models using `load_run` and `checkpoint`.
 
