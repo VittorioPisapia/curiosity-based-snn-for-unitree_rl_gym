@@ -88,28 +88,14 @@ If you encounter any issues, refer to the official documentation at `isaacgym/do
 
 `rsl_rl` is a library implementing reinforcement learning algorithms.
 
-#### 2.3.1 Download
-
-Clone the repository using Git:
-
-```bash
-git clone https://github.com/leggedrobotics/rsl_rl.git
-```
-
-#### 2.3.2 Switch Branch
-
-Switch to the v1.0.2 branch:
-
-```bash
-cd rsl_rl
-git checkout v1.0.2
-```
-
-#### 2.3.3 Install
+#### 2.3.2 Install
 
 ```bash
 pip install -e .
 ```
+#### 2.3.3 VecEnv bug
+
+There is a missing folder named env, working to fix it
 
 ### 2.4 Install unitree_rl_gym
 
