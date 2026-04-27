@@ -1,7 +1,6 @@
 <div align="center">
-  <h1 align="center">Unitree RL GYM (SNN & ICM Fork)</h1>
+  <h1 align="center">Curiosity killed the cat or made it more efficient?</h1>
   <p align="center">
-    <span> 🌎English </span> | <a href="README_zh.md"> 🇨🇳中文 </a>
   </p>
 </div>
 
@@ -195,6 +194,7 @@ This repository is built upon the support and contributions of the following ope
 - [rsl\_rl](https://github.com/leggedrobotics/rsl_rl.git): Reinforcement learning algorithm implementation.
 - [mujoco](https://github.com/google-deepmind/mujoco.git): Providing powerful simulation functionalities.
 - [unitree\_sdk2\_python](https://github.com/unitreerobotics/unitree_sdk2_python.git): Hardware communication interface for physical deployment.
+- [unitree-rl-gym](https://github.com/unitreerobotics/unitree_rl_gym) : Original implementation of Unitree's robots in Legged Gym
 
 ---
 
