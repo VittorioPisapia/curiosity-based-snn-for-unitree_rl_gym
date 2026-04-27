@@ -220,9 +220,6 @@ class IcmRunner ( SnnRunner ):
                 actions_batch = torch.clamp(torch.cat(self.icm_actions, dim=0), -clip_actions, clip_actions)
 
                 dataset_size = obs_batch.shape[0]
-                
-                
-   
                 batch_size = dataset_size // self.icm_num_mini_batches
 
                 mean_forward_loss = 0.0
@@ -230,6 +227,7 @@ class IcmRunner ( SnnRunner ):
                 update_steps = 0
 
                 for epoch in range(self.icm_epochs):
+                    
                     indices = torch.randperm(dataset_size, device=self.device)
                     
                     for i in range(0, dataset_size, batch_size):
