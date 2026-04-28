@@ -29,10 +29,10 @@ search_space = {
     # "policy.snn.snn_st": [],
     # "policy.snn.neuron_type": [],
     # "policy.snn.num_neurons": [],
-
-    #  "policy.icm.use_icm": [],
-    #  "policy.icm.icm_beta": [],
-    #  "policy.icm.icm_reward_clamp": [],
+    
+    # "policy.icm.use_icm": [],
+    # "policy.icm.icm_beta": [],
+    # "policy.icm.icm_reward_clamp": [],
     # "policy.icm.icm_epochs": [],
     # "policy.icm.num_mini_batches": [],
 
