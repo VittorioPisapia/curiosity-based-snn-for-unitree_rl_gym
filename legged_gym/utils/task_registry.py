@@ -128,7 +128,6 @@ class TaskRegistry():
             runner = SnnRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
             
         elif runner_class_name == 'IcmRunner': 
-            print("ONTI---------------------------------------")
             from rsl_rl.runners.icm_runner import IcmRunner 
             runner = IcmRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
             

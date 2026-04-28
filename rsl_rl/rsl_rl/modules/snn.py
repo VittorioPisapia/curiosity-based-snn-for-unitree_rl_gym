@@ -39,21 +39,27 @@ class Neurons(nn.Module):
 class SpikeFunctionGaussian(torch.autograd.Function):
     @staticmethod
     def forward(ctx, v_membrane, thresh, lens):
-        ctx.save_for_backward(v_membrane)
-        #ctx.save_for_backward(v_membrane, thresh)
+        #ctx.save_for_backward(v_membrane)
+        ctx.save_for_backward(v_membrane, thresh)
         ctx.thresh = thresh
         ctx.lens = lens
         return v_membrane.gt(thresh).float()
 
     @staticmethod
     def backward(ctx, grad_output):
-        v_membrane, = ctx.saved_tensors
-        thresh = ctx.thresh
+        v_membrane, thresh = ctx.saved_tensors
         lens = ctx.lens
-        grad_input = grad_output.clone()
+        
+        grad_output_clone = grad_output.clone()
         exp = torch.exp(-(v_membrane - thresh)**2 / (2 * lens))
-        temp = exp / math.sqrt(2 * math.pi * lens)
-        return grad_input * temp.float(), None, None
+        temp = (exp / math.sqrt(2 * math.pi * lens)).float()
+        
+        # Calculate gradients
+        grad_v_membrane = grad_output_clone * temp
+        grad_thresh = -grad_v_membrane # The chain rule gives us a negative sign here
+        
+        # Return gradients for (v_membrane, thresh, lens)
+        return grad_v_membrane, grad_thresh, None
 
 class LIFGaussian(Neurons):
     def __init__(
@@ -158,7 +164,7 @@ class SNN(nn.Module):
         self.spike_dim = 2 * hidden_dim
         self.mem_dim = 2 * hidden_dim
 
-        self.thresholds = nn.Parameter(
+        self.thresholds_raw = nn.Parameter(
             torch.full((self.spike_dim,), threshold_init, device=self.device) 
         )
         self.decays_raw = nn.Parameter(
@@ -182,10 +188,13 @@ class SNN(nn.Module):
                 local_states[hname] = h[:, start_idx:end_idx].clone()
 
         decays = torch.sigmoid(self.decays_raw[start_idx:end_idx])
+        #thresholds = torch.sigmoid(self.thresholds_raw[start_idx:end_idx])
+        thresholds = torch.relu(self.thresholds_raw[start_idx:end_idx]) + 0.1
 
         return self.fs(
             x,
-            self.thresholds[start_idx:end_idx] if output_spikes else None,
+            #self.thresholds[start_idx:end_idx] if output_spikes else None,
+            thresholds,
             decays,
             local_states,
             output_spikes
@@ -226,6 +235,7 @@ class SNN(nn.Module):
             self.last_m1_mean = h1["snn_m"].mean().item()
             self.last_m2_mean = h2["snn_m"].mean().item()
             self.last_decay_mean = torch.sigmoid(self.decays_raw).mean().item()
+            self.last_threshold_mean = (torch.relu(self.thresholds_raw) + 0.1).mean().item()
 
         out = self.fc3(h2["snn_m"])
         return out, current_state

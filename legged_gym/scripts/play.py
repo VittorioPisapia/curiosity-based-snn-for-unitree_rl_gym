@@ -100,7 +100,7 @@ def play(args):
         env.gym.set_camera_location(camera_handle, env.envs[0], camera_position, camera_target)
         
         video_writer = imageio.get_writer(video_path, fps=50)
-        print("Starting headless video recording...")
+        print("Starting video recording...")
         print(f"Video will be saved to: {video_path}")
 
     try:
@@ -230,7 +230,8 @@ def play(args):
             plt.savefig(plot_path, dpi=300) 
             print(f"Plots saved in : {plot_path}")
         
-        plt.show() 
+        if not getattr(args, 'headless', False):
+            plt.show()
         
 
     else:
