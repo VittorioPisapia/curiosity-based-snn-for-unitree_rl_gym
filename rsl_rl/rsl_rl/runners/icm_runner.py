@@ -68,7 +68,7 @@ class IcmRunner ( SnnRunner ):
 
         if self.use_icm:
             self.icm = ICM(env.num_obs, env.num_actions, hidden_dimension=128, activation="relu").to(self.device)
-            self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-4)
+            self.icm_optimizer = torch.optim.Adam(self.icm.parameters(), lr=1e-3)
 
         if self.use_rnd:
             self.rnd = RND(env.num_obs, feature_dimension=64, hidden_dimension=128, activation="relu").to(self.device)
@@ -206,7 +206,7 @@ class IcmRunner ( SnnRunner ):
                 start = stop
 
             if self.use_icm:
-                self.icm_intrinsic_coeff = max(0.001, self.icm_intrinsic_coeff * 0.999)
+                self.icm_intrinsic_coeff = max(0.001, self.icm_intrinsic_coeff * 0.9999)
             if self.use_rnd:
                 self.rnd_intrinsic_coeff = max(0.001, self.rnd_intrinsic_coeff * 0.999)
 
