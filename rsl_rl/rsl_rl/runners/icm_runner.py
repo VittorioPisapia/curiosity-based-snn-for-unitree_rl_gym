@@ -36,7 +36,9 @@ class IcmRunner ( SnnRunner ):
             self.icm_reward_clamp = self.icm_cfg.get("icm_reward_clamp", 0.05)
             self.icm_epochs = self.icm_cfg.get("icm_epochs", 4)
             self.icm_num_mini_batches = self.icm_cfg.get("icm_num_mini_batches", 4)
+            self.icm_decay = self.icm_cfg.get("icm_decay", 0.9999)
             self.running_std = torch.tensor(1.0, device=self.device)
+            
 
             print(f"Running ICM module with beta={self.beta}, icm_intrinsic_coeff={self.icm_intrinsic_coeff}, icm_reward_clamp={self.icm_reward_clamp}")
 
@@ -206,7 +208,7 @@ class IcmRunner ( SnnRunner ):
                 start = stop
 
             if self.use_icm:
-                self.icm_intrinsic_coeff = max(0.001, self.icm_intrinsic_coeff * 0.9999)
+                self.icm_intrinsic_coeff = max(0.001, self.icm_intrinsic_coeff * self.icm_decay)
             if self.use_rnd:
                 self.rnd_intrinsic_coeff = max(0.001, self.rnd_intrinsic_coeff * 0.999)
 

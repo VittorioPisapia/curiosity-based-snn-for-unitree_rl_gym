@@ -46,7 +46,7 @@ class GO2RoughCfg( LeggedRobotCfg ):
             dof_pos_limits = -10.0
 
             # New
-            # base_height = -5
+            base_height = -15
             feet_air_time = 0.01
             action_rate = -0.02
             slip = -0.01
