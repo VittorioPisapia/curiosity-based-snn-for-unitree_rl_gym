@@ -229,8 +229,28 @@ class ActorCriticSNN(nn.Module):
     def entropy(self):
         return self.distribution.entropy().sum(dim=-1)
 
-    def update_distribution(self, observations, hidden_states=None):
-        mean, _ = self.actor(observations, hidden_states=hidden_states)
+    def update_distribution(self, observations, hidden_states=None, dones=None):
+        if observations.dim() == 3:
+            seq_len, batch_size, _ = observations.shape
+            means = []
+            curr_hidden_states = hidden_states
+            
+            for t in range(seq_len):
+                if dones is not None:
+                    done_t = dones[t].squeeze(-1) 
+                    done_indices = done_t.nonzero(as_tuple=False).squeeze(-1)
+                    
+                    if done_indices.numel() > 0:
+                        curr_hidden_states["snn_m"][done_indices] = 0.0
+                        curr_hidden_states["snn_s"][done_indices] = 0.0
+
+                mean_t, curr_hidden_states = self.actor(observations[t], hidden_states=curr_hidden_states)
+                means.append(mean_t)
+                
+            mean = torch.stack(means, dim=0)
+        else:
+            mean, _ = self.actor(observations, hidden_states=hidden_states)
+
         self.distribution = Normal(mean, self.std.expand_as(mean))
 
     def act(self, observations, **kwargs):

@@ -92,13 +92,29 @@ class PPO_Snn (PPO):
         for obs_batch, critic_obs_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, \
             old_mu_batch, old_sigma_batch, hid_states_batch, masks_batch in generator:
 
+                self.actor_critic.update_distribution(obs_batch, hidden_states=hid_states_batch, dones=masks_batch)
 
-                self.actor_critic.update_distribution(obs_batch, hidden_states=hid_states_batch)
                 actions_log_prob_batch = self.actor_critic.get_actions_log_prob(actions_batch)
                 value_batch = self.actor_critic.evaluate(critic_obs_batch)
+                
                 mu_batch = self.actor_critic.action_mean
                 sigma_batch = self.actor_critic.action_std
                 entropy_batch = self.actor_critic.entropy
+
+                actions_log_prob_batch = actions_log_prob_batch.flatten(0, 1)
+                value_batch = value_batch.flatten(0, 1)
+                mu_batch = mu_batch.flatten(0, 1)
+                sigma_batch = sigma_batch.flatten(0, 1)
+                entropy_batch = entropy_batch.flatten(0, 1)
+                
+                old_mu_batch = old_mu_batch.flatten(0, 1)
+                old_sigma_batch = old_sigma_batch.flatten(0, 1)
+                old_actions_log_prob_batch = old_actions_log_prob_batch.flatten(0, 1)
+                advantages_batch = advantages_batch.flatten(0, 1)
+                returns_batch = returns_batch.flatten(0, 1)
+                target_values_batch = target_values_batch.flatten(0, 1)
+
+                # advantages_batch = (advantages_batch - advantages_batch.mean()) / (advantages_batch.std() + 1e-8)
 
                 # KL
                 if self.desired_kl != None and self.schedule == 'adaptive':
@@ -138,6 +154,18 @@ class PPO_Snn (PPO):
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
+
+                # # --- DEBUG DEI GRADIENTI ---
+                # # Calcola la norma totale dei gradienti solo per l'Actor (la SNN)
+                # actor_grads = [p.grad.detach() for p in self.actor_critic.actor.parameters() if p.grad is not None]
+                # if len(actor_grads) > 0:
+                #     grad_norm_pre_clip = torch.norm(torch.stack([torch.norm(g, 2) for g in actor_grads]), 2).item()
+                #     # Stampa se il gradiente è sospetto (es. esploso o svanito)
+                #     if grad_norm_pre_clip > 50.0 or grad_norm_pre_clip < 1e-4:
+                #         print(f"ATTENZIONE! Norma gradiente SNN pre-clip anomala: {grad_norm_pre_clip:.4f}")
+                # # ---------------------------
+
+
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 

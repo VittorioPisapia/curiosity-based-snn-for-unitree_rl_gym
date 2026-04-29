@@ -34,49 +34,38 @@ class RolloutStorage_Snn ( RolloutStorage ):
 
     def mini_batch_generator(self, num_mini_batches, num_epochs=8):
 
-        batch_size = self.num_envs * self.num_transitions_per_env
-        mini_batch_size = batch_size // num_mini_batches
-        indices = torch.randperm(num_mini_batches*mini_batch_size, requires_grad=False, device=self.device)
-
-        observations = self.observations.flatten(0, 1)
-        if self.privileged_observations is not None:
-            critic_observations = self.privileged_observations.flatten(0, 1)
-        else:
-            critic_observations = observations
-
-        actions = self.actions.flatten(0, 1)
-        values = self.values.flatten(0, 1)
-        returns = self.returns.flatten(0, 1)
-        old_actions_log_prob = self.actions_log_prob.flatten(0, 1)
-        advantages = self.advantages.flatten(0, 1)
-        old_mu = self.mu.flatten(0, 1)
-        old_sigma = self.sigma.flatten(0, 1)
-        snn_m = self.snn_m.flatten(0,1)
-        snn_s = self.snn_s.flatten(0,1)
-
+        envs_per_batch = self.num_envs // num_mini_batches
 
         for epoch in range(num_epochs):
+            env_indices = torch.randperm(self.num_envs, requires_grad=False, device=self.device)
+
             for i in range(num_mini_batches):
+                start = i * envs_per_batch
+                end = (i+1) * envs_per_batch
+                batch_env_idx = env_indices[start:end]
 
-                start = i*mini_batch_size
-                end = (i+1)*mini_batch_size
-                batch_idx = indices[start:end]
+                obs_batch = self.observations[:, batch_env_idx, :]
 
-                obs_batch = observations[batch_idx]
-                critic_observations_batch = critic_observations[batch_idx]
-                actions_batch = actions[batch_idx]
-                target_values_batch = values[batch_idx]
-                returns_batch = returns[batch_idx]
-                old_actions_log_prob_batch = old_actions_log_prob[batch_idx]
-                advantages_batch = advantages[batch_idx]
-                old_mu_batch = old_mu[batch_idx]
-                old_sigma_batch = old_sigma[batch_idx]
-                snn_m_batch = snn_m[batch_idx]
-                snn_s_batch = snn_s[batch_idx]
+                if self.privileged_observations is not None:
+                    critic_observations_batch = self.privileged_observations[:, batch_env_idx, :]
+                else:
+                    critic_observations_batch = obs_batch
+                
+                actions_batch = self.actions[:, batch_env_idx, :]
+                target_values_batch = self.values[:, batch_env_idx, :]
+                returns_batch = self.returns[:, batch_env_idx, :]
+                old_actions_log_prob_batch = self.actions_log_prob[:, batch_env_idx, :]
+                advantages_batch = self.advantages[:, batch_env_idx, :]
+                old_mu_batch = self.mu[:, batch_env_idx, :]
+                old_sigma_batch = self.sigma[:, batch_env_idx, :]
+
+                snn_m_batch_init = self.snn_m[0, batch_env_idx, :]
+                snn_s_batch_init = self.snn_s[0, batch_env_idx, :]  
+
                 hidden_states_batch = {
-                    "snn_m": snn_m_batch,
-                    "snn_s": snn_s_batch
+                "snn_m": snn_m_batch_init,
+                "snn_s": snn_s_batch_init
                 }
 
                 yield obs_batch, critic_observations_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, \
-                    old_actions_log_prob_batch, old_mu_batch, old_sigma_batch, hidden_states_batch, None
+                old_actions_log_prob_batch, old_mu_batch, old_sigma_batch, hidden_states_batch, None
