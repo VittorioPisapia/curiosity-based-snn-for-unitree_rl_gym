@@ -155,15 +155,15 @@ class PPO_Snn (PPO):
                 self.optimizer.zero_grad()
                 loss.backward()
 
-                # # --- DEBUG DEI GRADIENTI ---
-                # # Calcola la norma totale dei gradienti solo per l'Actor (la SNN)
-                # actor_grads = [p.grad.detach() for p in self.actor_critic.actor.parameters() if p.grad is not None]
-                # if len(actor_grads) > 0:
-                #     grad_norm_pre_clip = torch.norm(torch.stack([torch.norm(g, 2) for g in actor_grads]), 2).item()
-                #     # Stampa se il gradiente è sospetto (es. esploso o svanito)
-                #     if grad_norm_pre_clip > 50.0 or grad_norm_pre_clip < 1e-4:
-                #         print(f"ATTENZIONE! Norma gradiente SNN pre-clip anomala: {grad_norm_pre_clip:.4f}")
-                # # ---------------------------
+                # --- DEBUG DEI GRADIENTI ---
+                # Calcola la norma totale dei gradienti solo per l'Actor (la SNN)
+                actor_grads = [p.grad.detach() for p in self.actor_critic.actor.parameters() if p.grad is not None]
+                if len(actor_grads) > 0:
+                    grad_norm_pre_clip = torch.norm(torch.stack([torch.norm(g, 2) for g in actor_grads]), 2).item()
+                    # Stampa se il gradiente è sospetto (es. esploso o svanito)
+                    if grad_norm_pre_clip > 50.0 or grad_norm_pre_clip < 1e-4:
+                        print(f"ATTENZIONE! Norma gradiente SNN pre-clip anomala: {grad_norm_pre_clip:.4f}")
+                # ---------------------------
 
 
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
