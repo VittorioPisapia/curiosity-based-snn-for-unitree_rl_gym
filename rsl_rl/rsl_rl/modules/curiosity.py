@@ -39,8 +39,11 @@ class ICM(nn.Module):
 
             encoder_layers = []
             encoder_layers.append(nn.Linear(num_obs,hidden_dimension))
+            encoder_layers.append(nn.LayerNorm(hidden_dimension))
             encoder_layers.append(activation)
-            encoder_layers.append(nn.Linear(hidden_dimension,encoder_output))
+            encoder_layers.append(nn.Linear(hidden_dimension, hidden_dimension))
+            encoder_layers.append(activation)
+            encoder_layers.append(nn.Linear(hidden_dimension, encoder_output))
 
             self.encoder_model = nn.Sequential(*encoder_layers)
 

@@ -16,6 +16,7 @@ class GO2RoughICMCfgPPO( GO2RoughSNNCfgPPO):
             use_rnd = False
             rnd_intrinsic_coeff = 0.007
             rnd_reward_clamp = 0.05
+            rnd_decay = 0.9999
 
     class runner ( GO2RoughSNNCfgPPO.runner ):
         experiment_name = "rough_go2_icm"
