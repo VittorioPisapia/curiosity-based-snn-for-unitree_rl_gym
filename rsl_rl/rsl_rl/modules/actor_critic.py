@@ -238,8 +238,8 @@ class ActorCriticSNN(nn.Module):
         self.distribution = Normal(mean, self.std.expand_as(mean))
 
         self.hidden_states = {
-            "snn_m": next_hidden_states["snn_m"].detach(),
-            "snn_s": next_hidden_states["snn_s"].detach()
+            "snn_m": next_hidden_states["snn_m"],
+            "snn_s": next_hidden_states["snn_s"]
         }
 
         return self.distribution.sample()
@@ -251,8 +251,8 @@ class ActorCriticSNN(nn.Module):
         actions_mean, next_hidden_states = self.actor(observations, hidden_states=self.hidden_states)
 
         self.hidden_states = {
-            "snn_m" : next_hidden_states["snn_m"].detach(),
-            "snn_s" : next_hidden_states["snn_s"].detach()
+            "snn_m" : next_hidden_states["snn_m"],
+            "snn_s" : next_hidden_states["snn_s"]
         }
 
         return actions_mean

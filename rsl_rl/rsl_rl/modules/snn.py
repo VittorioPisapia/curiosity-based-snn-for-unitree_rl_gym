@@ -214,8 +214,8 @@ class SNN(nn.Module):
             }
         else:
             current_state = {
-                "snn_m": hidden_states["snn_m"].detach().clone(),
-                "snn_s": hidden_states["snn_s"].detach().clone(),
+                "snn_m": hidden_states["snn_m"].clone(),
+                "snn_s": hidden_states["snn_s"].clone(),
             }
 
         for _ in range(st):
