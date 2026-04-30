@@ -14,7 +14,7 @@ class GO2RoughICMCfgPPO( GO2RoughSNNCfgPPO):
             icm_num_mini_batches = 4
 
             use_rnd = True
-            rnd_intrinsic_coeff = 0.05
+            rnd_intrinsic_coeff = 0.01
             rnd_reward_clamp = 0.05
             rnd_num_mini_batches = 4
             rnd_epochs = 5
