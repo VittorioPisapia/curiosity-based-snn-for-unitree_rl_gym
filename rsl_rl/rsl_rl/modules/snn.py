@@ -152,7 +152,8 @@ class SNN(nn.Module):
 
         self.fc1 = nn.Linear(input_dim, hidden_dim)
         self.fc2 = nn.Linear(hidden_dim, hidden_dim)
-        self.fc3 = nn.Linear(hidden_dim, output_dim)
+        self.fc3 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc4 = nn.Linear(hidden_dim, output_dim)
 
         if neuron_type == "Gaussian":
             self.fs = LIFGaussian(lens=lens, device=self.device)
@@ -161,8 +162,8 @@ class SNN(nn.Module):
         else:
             raise ValueError(f"Unsupported neuron type: {neuron_type}")
 
-        self.spike_dim = 2 * hidden_dim
-        self.mem_dim = 2 * hidden_dim
+        self.spike_dim = 3 * hidden_dim
+        self.mem_dim = 3 * hidden_dim
 
         self.thresholds_raw = nn.Parameter(
             torch.full((self.spike_dim,), threshold_init, device=self.device) 
@@ -173,8 +174,10 @@ class SNN(nn.Module):
 
         self.last_s1_rate = 0.0
         self.last_s2_rate = 0.0
+        self.last_s3_rate = 0.0
         self.last_m1_mean = 0.0
         self.last_m2_mean = 0.0
+        self.last_m3_mean = 0.0
         self.last_decay_mean = 0.0
 
     def _neurons_forward(self, x, hidden_states, start_idx, end_idx, output_spikes=True):
@@ -225,17 +228,22 @@ class SNN(nn.Module):
             z2 = self.fc2(h1["snn_s"])
             h2 = self._neurons_forward(z2, current_state, self.hidden_dim, 2 * self.hidden_dim, True)
 
+            z3 = self.fc2(h1["snn_s"])
+            h3 = self._neurons_forward(z3, current_state, self.hidden_dim, 2 * self.hidden_dim, True)
+
             current_state = {
-                "snn_m": torch.cat([h1["snn_m"], h2["snn_m"]], dim=1),
-                "snn_s": torch.cat([h1["snn_s"], h2["snn_s"]], dim=1),
+                "snn_m": torch.cat([h1["snn_m"], h2["snn_m"], h3["snn_m"]],  dim=1),
+                "snn_s": torch.cat([h1["snn_s"], h2["snn_s"], h3["snn_s"]],  dim=1),
             }
 
             self.last_s1_rate = h1["snn_s"].mean().item()
             self.last_s2_rate = h2["snn_s"].mean().item()
+            self.last_s3_rate = h3["snn_s"].mean().item()
             self.last_m1_mean = h1["snn_m"].mean().item()
             self.last_m2_mean = h2["snn_m"].mean().item()
+            self.last_m3_mean = h3["snn_m"].mean().item()
             self.last_decay_mean = torch.sigmoid(self.decays_raw).mean().item()
             self.last_threshold_mean = (torch.relu(self.thresholds_raw) + 0.1).mean().item()
 
-        out = self.fc3(h2["snn_m"])
+        out = self.fc4(h3["snn_m"])
         return out, current_state

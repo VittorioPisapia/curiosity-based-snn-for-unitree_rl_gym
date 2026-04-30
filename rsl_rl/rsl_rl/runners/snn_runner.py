@@ -135,8 +135,10 @@ class SnnRunner ( OnPolicyRunner ):
         actor = self.alg.actor_critic.actor
         s1_rate = getattr(actor, "last_s1_rate", float("nan"))
         s2_rate = getattr(actor, "last_s2_rate", float("nan"))
+        s3_rate = getattr(actor, "last_s3_rate", float("nan"))
         m1_mean = getattr(actor, "last_m1_mean", float("nan"))
         m2_mean = getattr(actor, "last_m2_mean", float("nan"))
+        m3_mean = getattr(actor, "last_m3_mean", float("nan"))
         decay_mean = getattr(actor, "last_decay_mean", float("nan"))
         threshold_mean = getattr(actor, "last_threshold_mean", float("nan"))
 
@@ -147,8 +149,10 @@ class SnnRunner ( OnPolicyRunner ):
 
         self.writer.add_scalar('SNN/s1_spike_rate', self.alg.actor_critic.actor.last_s1_rate, locs['it'])
         self.writer.add_scalar('SNN/s2_spike_rate', self.alg.actor_critic.actor.last_s2_rate, locs['it'])
+        self.writer.add_scalar('SNN/s3_spike_rate', self.alg.actor_critic.actor.last_s3_rate, locs['it'])
         self.writer.add_scalar('SNN/m1_mean', self.alg.actor_critic.actor.last_m1_mean, locs['it'])
         self.writer.add_scalar('SNN/m2_mean', self.alg.actor_critic.actor.last_m2_mean, locs['it'])
+        self.writer.add_scalar('SNN/m3_mean', self.alg.actor_critic.actor.last_m3_mean, locs['it'])
         self.writer.add_scalar('SNN/decay_mean', self.alg.actor_critic.actor.last_decay_mean, locs['it'])
         self.writer.add_scalar('SNN/threshold_mean', self.alg.actor_critic.actor.last_threshold_mean, locs['it'])
         if len(locs['rewbuffer']) > 0:
@@ -168,8 +172,10 @@ class SnnRunner ( OnPolicyRunner ):
               f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
               f"""{'SNN s1 spike rate:':>{pad}} {s1_rate:.4f}\n"""
               f"""{'SNN s2 spike rate:':>{pad}} {s2_rate:.4f}\n"""
+              f"""{'SNN s3 spike rate:':>{pad}} {s3_rate:.4f}\n"""
               f"""{'SNN m1 mean:':>{pad}} {m1_mean:.4f}\n"""
               f"""{'SNN m2 mean:':>{pad}} {m2_mean:.4f}\n"""
+              f"""{'SNN m3 mean:':>{pad}} {m3_mean:.4f}\n"""
               f"""{'SNN decay mean:':>{pad}} {decay_mean:.4f}\n"""
               f"""{'SNN threshold mean:':>{pad}} {threshold_mean:.4f}\n"""
               f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
