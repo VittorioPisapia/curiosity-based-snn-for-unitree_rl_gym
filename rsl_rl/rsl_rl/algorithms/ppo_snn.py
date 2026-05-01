@@ -3,6 +3,8 @@ import torch.nn as nn
 import torch.optim as optim
 
 from rsl_rl.modules.actor_critic import ActorCriticSNN
+from rsl_rl.modules.rnd import RandomNetworkDistillation
+from rsl_rl.modules.mlp import MLP
 from rsl_rl.storage.rollout_storage_snn import RolloutStorage_Snn
 from rsl_rl.algorithms.ppo import PPO
 
@@ -23,6 +25,8 @@ class PPO_Snn (PPO):
                  schedule="fixed",
                  desired_kl=0.01,
                  device='cpu',
+                 use_rnd=False,      
+                 rnd_cfg=None        
                  ):
 
         self.device = device
@@ -37,6 +41,25 @@ class PPO_Snn (PPO):
         self.storage = None # initialized later
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=learning_rate)
         self.transition = RolloutStorage_Snn.Transition()
+
+        self.use_rnd = use_rnd
+        if self.use_rnd:
+            rnd_cfg = rnd_cfg or {}
+            
+            # Create a copy so we don't accidentally mutate the original config
+            rnd_kwargs = rnd_cfg.copy()
+            # Remove 'use_rnd' so it doesn't get passed into the RND constructor
+            rnd_kwargs.pop("use_rnd", None) 
+            
+            # --- NEW FIX ---
+            # If the config parsed num_states as a list or tuple (e.g. [45]), extract the raw integer
+            if "num_states" in rnd_kwargs and isinstance(rnd_kwargs["num_states"], (list, tuple)):
+                rnd_kwargs["num_states"] = rnd_kwargs["num_states"][0]
+            # ---------------
+            
+            self.rnd = RandomNetworkDistillation(device=self.device, **rnd_kwargs) 
+        else:
+            self.rnd = None
 
         # PPO parameters
         self.clip_param = clip_param
@@ -85,6 +108,7 @@ class PPO_Snn (PPO):
     def update(self):
         mean_value_loss = 0
         mean_surrogate_loss = 0
+        mean_rnd_loss = 0 if self.use_rnd else None
         if self.actor_critic.is_recurrent:
             generator = self.storage.reccurent_mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
         else:
@@ -135,6 +159,18 @@ class PPO_Snn (PPO):
 
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
+                if self.use_rnd:
+                    obs_without_commands = torch.cat((obs_batch[:, :9], obs_batch[:, 12:]), dim=-1)
+                    
+                    rnd_loss = self.rnd.compute_loss(obs_without_commands)
+                    
+                    self.rnd.optimizer.zero_grad()
+                    rnd_loss.backward()
+                    self.rnd.optimizer.step()
+                    
+                    mean_rnd_loss += rnd_loss.item()
+
+                
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -147,6 +183,8 @@ class PPO_Snn (PPO):
         num_updates = self.num_learning_epochs * self.num_mini_batches
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates
+        if mean_rnd_loss is not None:
+            mean_rnd_loss /= num_updates
         self.storage.clear()
 
-        return mean_value_loss, mean_surrogate_loss
+        return mean_value_loss, mean_surrogate_loss, mean_rnd_loss
