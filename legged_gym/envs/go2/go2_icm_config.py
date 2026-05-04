@@ -21,3 +21,6 @@ class GO2RoughICMCfgPPO( GO2RoughSNNCfgPPO):
 
     class runner ( GO2RoughSNNCfgPPO.runner ):
         experiment_name = "rough_go2_icm"
+
+    class algorithm ( GO2RoughSNNCfgPPO.algorithm ):
+        use_rnd = True
