@@ -130,6 +130,10 @@ class TaskRegistry():
         elif runner_class_name == 'IcmRunner': 
             from rsl_rl.runners.icm_runner import IcmRunner 
             runner = IcmRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+
+        elif runner_class_name == 'RndRunner': 
+            from rsl_rl.runners.rnd_runner import RndRunner 
+            runner = RndRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
             
         else:
             raise ValueError(f"Unknown runner class: {runner_class_name}. Please check your config file!")

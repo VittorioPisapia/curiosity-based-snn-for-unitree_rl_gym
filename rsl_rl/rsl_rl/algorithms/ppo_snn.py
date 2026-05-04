@@ -12,7 +12,7 @@ class PPO_Snn (PPO):
     def __init__(self,
                  actor_critic,
                  use_rnd,
-                 rnd_cfg,
+                 rnd,
                  num_learning_epochs=1,
                  num_mini_batches=1,
                  clip_param=0.2,
@@ -36,7 +36,7 @@ class PPO_Snn (PPO):
         self.use_rnd = use_rnd
 
         # RND 
-        self.rnd = RandomNetworkDistillation(device=self.device, **rnd_cfg) if self.use_rnd else None
+        self.rnd = RandomNetworkDistillation(device=self.device, **rnd) if self.use_rnd else None
 
         # PPO components
         self.actor_critic = actor_critic
@@ -145,7 +145,11 @@ class PPO_Snn (PPO):
 
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
-                rnd_loss = self.rnd.compute_loss(batch.observations[:original_batch_size]) if self.use_rnd else None
+                if self.use_rnd:
+                    obs_batch_without_commands = torch.cat((obs_batch[:, :9], obs_batch[:, 12:]), dim=-1)
+                    rnd_loss = self.rnd.compute_loss(obs_batch_without_commands)
+                else:
+                    rnd_loss = None
 
                 # Gradient step
                 self.optimizer.zero_grad()

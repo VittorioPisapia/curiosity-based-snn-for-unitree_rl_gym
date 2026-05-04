@@ -5,7 +5,7 @@ import statistics
 
 import torch
 
-from .on_policy_runner import OnPolicyRunner
+from .snn_runner import SnnRunner
 from rsl_rl.modules.actor_critic import ActorCriticSNN
 from rsl_rl.algorithms.ppo_snn import PPO_Snn
 from rsl_rl.env import VecEnv
@@ -18,13 +18,14 @@ class RndRunner ( SnnRunner ):
                  log_dir=None,
                  device='cpu'):
 
-        self.cfg=train_cfg["runner"]
+        self.cfg = train_cfg["runner"]
         self.alg_cfg = train_cfg["algorithm"]
         self.policy_cfg = train_cfg["policy"]
-        self.icm_cfg = policy_cfg["icm"]
         self.device = device
         self.env = env
-        self.use_rnd = self.icm_cfg["use_rnd"]
+        
+        self.use_rnd = self.alg_cfg["use_rnd"]
+        self.rnd_cfg = self.alg_cfg["rnd"]
 
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
@@ -74,6 +75,7 @@ class RndRunner ( SnnRunner ):
         tot_iter = self.current_learning_iteration + num_learning_iterations
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
+            mean_intrinsic_reward = 0.0 
             # Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
@@ -81,15 +83,22 @@ class RndRunner ( SnnRunner ):
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
-                    self.alg.process_env_step(rewards, dones, infos)
 
-                    intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(obs) if self.use_rnd else None
+                    obs_without_commands = torch.cat((obs[:, :9],obs[:, 12:]), dim=-1)
+                    intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(obs_without_commands) if self.use_rnd else None
 
                     if self.use_rnd:
                         total_rewards = rewards + intrinsic_rewards
+
+                        if self.use_rnd:
+                            total_rewards = rewards + intrinsic_rewards
+                            mean_intrinsic_reward += intrinsic_rewards.mean().item()
+
                     else:
                         total_rewards = rewards
                     
+                    self.alg.process_env_step(total_rewards, dones, infos)
+
                     if self.log_dir is not None:
                         # Book keeping
                         if 'episode' in infos:
@@ -152,6 +161,8 @@ class RndRunner ( SnnRunner ):
 
         self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
+        if locs.get('mean_rnd_loss') is not None:
+            self.writer.add_scalar('Loss/rnd_loss', locs['mean_rnd_loss'], locs['it'])
         self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
 
@@ -166,6 +177,8 @@ class RndRunner ( SnnRunner ):
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_reward/time', statistics.mean(locs['rewbuffer']), self.tot_time)
             self.writer.add_scalar('Train/mean_episode_length/time', statistics.mean(locs['lenbuffer']), self.tot_time)
+            if self.use_rnd:
+                self.writer.add_scalar('Train/mean_intrinsic_reward_step', locs['mean_intrinsic_reward'] / self.num_steps_per_env, locs['it'])
 
         str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
 
