@@ -6,6 +6,7 @@ from rsl_rl.modules.actor_critic import ActorCriticSNN
 from rsl_rl.storage.rollout_storage_snn import RolloutStorage_Snn
 from rsl_rl.algorithms.ppo import PPO
 from rsl_rl.modules.rnd import RandomNetworkDistillation
+from rsl_rl.modules.normalization import EmpiricalNormalization, EmpiricalDiscountedVariationNormalization
 
 class PPO_Snn (PPO):
     actor_critic: ActorCriticSNN
@@ -37,6 +38,10 @@ class PPO_Snn (PPO):
 
         # RND 
         self.rnd = RandomNetworkDistillation(device=self.device, **rnd) if self.use_rnd else None
+
+        # Normalizer
+        self.state_normalizer = EmpiricalNormalization(shape=rnd["num_obs"]).to(self.device)
+        #reward_normalizer = EmpiricalDiscountedVariationNormalization(shape=(1,), gamma=0.99)
 
         # PPO components
         self.actor_critic = actor_critic
@@ -146,8 +151,18 @@ class PPO_Snn (PPO):
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
                 if self.use_rnd:
-                    obs_batch_without_commands = torch.cat((obs_batch[:, :9], obs_batch[:, 12:]), dim=-1)
-                    rnd_loss = self.rnd.compute_loss(obs_batch_without_commands)
+                    obs_batch_for_rnd = torch.cat((obs_batch[:, :9], obs_batch[:, 12:-12]), dim=-1)
+                    
+                    normalized_obs_batch = self.state_normalizer(obs_batch_for_rnd)
+
+                    # --- DEBUG PRINT ---
+                    
+                    with torch.no_grad():
+                        target_out = self.rnd.target(normalized_obs_batch)
+                        print(f" Norm Obs Std: {normalized_obs_batch.std().item():.4f} | Target Out Std: {target_out.std().item():.4f}")
+                    # -------------------
+                    
+                    rnd_loss = self.rnd.compute_loss(normalized_obs_batch)
                 else:
                     rnd_loss = None
 
@@ -167,11 +182,11 @@ class PPO_Snn (PPO):
 
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()
+                if mean_rnd_loss is not None:
+                    mean_rnd_loss += rnd_loss.item()
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
 
-        if mean_rnd_loss is not None:
-            mean_rnd_loss += rnd_loss.item()
 
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates

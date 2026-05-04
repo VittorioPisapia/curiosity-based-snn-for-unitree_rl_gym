@@ -44,6 +44,8 @@ class RndRunner ( SnnRunner ):
         # init storage and model
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])
 
+        self.normalizer = self.alg.state_normalizer
+
         # Log
         self.log_dir = log_dir
         self.writer = None
@@ -69,7 +71,9 @@ class RndRunner ( SnnRunner ):
         ep_infos = []
         rewbuffer = deque(maxlen=100)
         lenbuffer = deque(maxlen=100)
+        ext_rewbuffer = deque(maxlen=100)
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+        cur_ext_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
         tot_iter = self.current_learning_iteration + num_learning_iterations
@@ -84,8 +88,9 @@ class RndRunner ( SnnRunner ):
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
-                    obs_without_commands = torch.cat((obs[:, :9],obs[:, 12:]), dim=-1)
-                    intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(obs_without_commands) if self.use_rnd else None
+                    obs_for_rnd = torch.cat((obs[:, :9], obs[:, 12:-12]), dim=-1) # No actions, no commands
+                    normalized_state = self.normalizer(obs_for_rnd)
+                    intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(normalized_state) if self.use_rnd else None
 
                     if self.use_rnd:
                         total_rewards = rewards + intrinsic_rewards
@@ -104,12 +109,15 @@ class RndRunner ( SnnRunner ):
                         if 'episode' in infos:
                             ep_infos.append(infos['episode'])
                         cur_reward_sum += total_rewards
+                        cur_ext_reward_sum += rewards
                         cur_episode_length += 1
                         new_ids = (dones > 0).nonzero(as_tuple=False)
                         rewbuffer.extend(cur_reward_sum[new_ids][:, 0].cpu().numpy().tolist())
+                        ext_rewbuffer.extend(cur_ext_reward_sum[new_ids][:, 0].cpu().numpy().tolist()) 
                         lenbuffer.extend(cur_episode_length[new_ids][:, 0].cpu().numpy().tolist())
                         cur_reward_sum[new_ids] = 0
                         cur_episode_length[new_ids] = 0
+                        cur_ext_reward_sum[new_ids] = 0
 
                 stop = time.time()
                 collection_time = stop - start
@@ -174,6 +182,7 @@ class RndRunner ( SnnRunner ):
         self.writer.add_scalar('SNN/threshold_mean', self.alg.actor_critic.actor.last_threshold_mean, locs['it'])
         if len(locs['rewbuffer']) > 0:
             self.writer.add_scalar('Train/mean_reward', statistics.mean(locs['rewbuffer']), locs['it'])
+            self.writer.add_scalar('Train/mean_extrinsic_reward', statistics.mean(locs['ext_rewbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_reward/time', statistics.mean(locs['rewbuffer']), self.tot_time)
             self.writer.add_scalar('Train/mean_episode_length/time', statistics.mean(locs['lenbuffer']), self.tot_time)
@@ -196,6 +205,7 @@ class RndRunner ( SnnRunner ):
               f"""{'SNN decay mean:':>{pad}} {decay_mean:.4f}\n"""
               f"""{'SNN threshold mean:':>{pad}} {threshold_mean:.4f}\n"""
               f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
+              f"""{'Mean extrinsic reward:':>{pad}} {statistics.mean(locs['ext_rewbuffer']):.2f}\n"""
               f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n""")
         else:
             log_string = (f"""{'#' * width}\n"""

@@ -3,7 +3,6 @@ from .go2_snn_config import GO2RoughSNNCfgPPO
 class GO2RoughRNDCfgPPO( GO2RoughSNNCfgPPO):
 
     runner_class_name = "RndRunner"
-    class policy ( GO2RoughSNNCfgPPO.policy ):
 
     class runner ( GO2RoughSNNCfgPPO.runner ):
         experiment_name = "rough_go2_rnd"
@@ -12,9 +11,9 @@ class GO2RoughRNDCfgPPO( GO2RoughSNNCfgPPO):
         use_rnd = True
 
         class rnd:
-            num_obs = 48 - 3
-            num_outputs = 24
-            predictor_hidden_dims = [24, 24]
-            target_hidden_dims = [24]
+            num_obs = 48 - 3 - 12
+            num_outputs = 64
+            predictor_hidden_dims = [128, 128]
+            target_hidden_dims = [128]
             learning_rate = 1.e-4
-            weight = 100
+            weight = 0.00008

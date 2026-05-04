@@ -36,6 +36,19 @@ class RandomNetworkDistillation(nn.Module):
 
         self.optimizer = torch.optim.Adam(self.predictor.parameters(), lr=learning_rate)
 
+        for m in self.target.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=1.414) # sqrt(2) gain
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+                    
+        # Optional: Initialize the predictor cleanly as well
+        for m in self.predictor.modules():
+            if isinstance(m, nn.Linear):
+                nn.init.orthogonal_(m.weight, gain=1.0)
+                if m.bias is not None:
+                    nn.init.zeros_(m.bias)
+
     def get_intrinsic_reward(self, obs):
 
         self.update_counter += 1
