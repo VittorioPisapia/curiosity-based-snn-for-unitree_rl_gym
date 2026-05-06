@@ -80,6 +80,7 @@ class RndRunner ( SnnRunner ):
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
             mean_intrinsic_reward = 0.0 
+            mean_extrinsic_reward = 0.0
             # Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
@@ -91,6 +92,8 @@ class RndRunner ( SnnRunner ):
                     obs_for_rnd = torch.cat((obs[:, :9], obs[:, 12:-(12+187)]), dim=-1) # No actions, no commands, no heights
                     normalized_state = self.normalizer(obs_for_rnd)
                     intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(normalized_state) if self.use_rnd else None
+
+                    mean_extrinsic_reward += rewards.mean().item()
 
                     if self.use_rnd:
                         total_rewards = rewards + intrinsic_rewards
@@ -186,6 +189,7 @@ class RndRunner ( SnnRunner ):
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_reward/time', statistics.mean(locs['rewbuffer']), self.tot_time)
             self.writer.add_scalar('Train/mean_episode_length/time', statistics.mean(locs['lenbuffer']), self.tot_time)
+            self.writer.add_scalar('Train/mean_extrinsic_reward_step', locs['mean_extrinsic_reward'] / self.num_steps_per_env, locs['it'])
             if self.use_rnd:
                 self.writer.add_scalar('Train/mean_intrinsic_reward_step', locs['mean_intrinsic_reward'] / self.num_steps_per_env, locs['it'])
 
