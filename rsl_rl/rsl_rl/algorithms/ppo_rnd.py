@@ -151,7 +151,7 @@ class PPO_Rnd (PPO):
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
                 if self.use_rnd:
-                    obs_batch_for_rnd = torch.cat((obs_batch[:, :9], obs_batch[:, 12:-(12+187)]), dim=-1)
+                    obs_batch_for_rnd = torch.cat((obs_batch[:, :9], obs_batch[:, 12:-(12)]), dim=-1)    #+187 add it for height measurements
                     
                     normalized_obs_batch = self.state_normalizer(obs_batch_for_rnd)
                     

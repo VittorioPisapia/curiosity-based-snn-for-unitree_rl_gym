@@ -50,7 +50,7 @@ class GO2RoughCfg( LeggedRobotCfg ):
             feet_air_time = 0.01
             action_rate = -0.02
             slip = -0.01
-            #cost_of_transport = -0.15 # -0.05 ~ -0.2
+            cost_of_transport = -0.1 # -0.05 ~ -0.2
 
 class GO2RoughCfgPPO( LeggedRobotCfgPPO ):
     class algorithm( LeggedRobotCfgPPO.algorithm ):

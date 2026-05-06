@@ -6,6 +6,7 @@ class GO2RoughRNDCfgPPO( GO2RoughSNNCfgPPO):
 
     class runner ( GO2RoughSNNCfgPPO.runner ):
         experiment_name = "rough_go2_rnd"
+        algorithm_class_name = 'PPO_Rnd'
 
     class algorithm ( GO2RoughSNNCfgPPO.algorithm ):
         use_rnd = True
