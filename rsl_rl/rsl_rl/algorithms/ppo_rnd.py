@@ -8,10 +8,12 @@ from rsl_rl.algorithms.ppo import PPO
 from rsl_rl.modules.rnd import RandomNetworkDistillation
 from rsl_rl.modules.normalization import EmpiricalNormalization, EmpiricalDiscountedVariationNormalization
 
-class PPO_Snn (PPO):
+class PPO_Rnd (PPO):
     actor_critic: ActorCriticSNN
     def __init__(self,
                  actor_critic,
+                 use_rnd ,
+                 rnd ,
                  num_learning_epochs=1,
                  num_mini_batches=1,
                  clip_param=0.2,
@@ -32,6 +34,14 @@ class PPO_Snn (PPO):
         self.desired_kl = desired_kl
         self.schedule = schedule
         self.learning_rate = learning_rate
+        self.use_rnd = use_rnd
+
+        # RND 
+        self.rnd = RandomNetworkDistillation(device=self.device, **rnd) if self.use_rnd else None
+
+        # Normalizer
+        self.state_normalizer = EmpiricalNormalization(shape=rnd["num_obs"]).to(self.device)
+        #reward_normalizer = EmpiricalDiscountedVariationNormalization(shape=(1,), gamma=0.99)
 
         # PPO components
         self.actor_critic = actor_critic
@@ -88,6 +98,7 @@ class PPO_Snn (PPO):
 
         mean_value_loss = 0
         mean_surrogate_loss = 0
+        mean_rnd_loss = 0 if self.use_rnd else None
 
         if self.actor_critic.is_recurrent:
             generator = self.storage.reccurent_mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
@@ -139,23 +150,42 @@ class PPO_Snn (PPO):
 
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
 
+                if self.use_rnd:
+                    obs_batch_for_rnd = torch.cat((obs_batch[:, :9], obs_batch[:, 12:-(12+187)]), dim=-1)
+                    
+                    normalized_obs_batch = self.state_normalizer(obs_batch_for_rnd)
+                    
+                    rnd_loss = self.rnd.compute_loss(normalized_obs_batch)
+                else:
+                    rnd_loss = None
+
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
 
+                if self.use_rnd:
+                    self.rnd.optimizer.zero_grad()
+                    rnd_loss.backward()
 
                 nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
+                if self.use_rnd:
+                    self.rnd.optimizer.step()
+
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()
+                if mean_rnd_loss is not None:
+                    mean_rnd_loss += rnd_loss.item()
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
 
 
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates
+        if mean_rnd_loss is not None:
+            mean_rnd_loss /= num_updates
 
         self.storage.clear()
 
-        return mean_value_loss, mean_surrogate_loss
+        return mean_value_loss, mean_surrogate_loss, mean_rnd_loss

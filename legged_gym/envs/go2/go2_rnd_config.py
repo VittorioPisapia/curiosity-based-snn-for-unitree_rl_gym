@@ -11,7 +11,7 @@ class GO2RoughRNDCfgPPO( GO2RoughSNNCfgPPO):
         use_rnd = True
 
         class rnd:
-            num_obs = 48 - 3 - 12
+            num_obs = 48 - 3 - 12 # + 187
             num_outputs = 64
             predictor_hidden_dims = [128, 128]
             target_hidden_dims = [128]
