@@ -109,6 +109,13 @@ class Terrain:
             terrain_utils.stepping_stones_terrain(terrain, stone_size=stepping_stones_size, stone_distance=stone_distance, max_height=0., platform_size=4.)
         elif choice < self.proportions[6]:
             gap_terrain(terrain, gap_size=gap_size, platform_size=3.)
+        elif choice < self.proportions[7]:
+            moat_terrain(
+                terrain,
+                moat_depth=1.0,
+                moat_width=0.5,
+                platform_size=2.0
+            )
         else:
             pit_terrain(terrain, depth=pit_depth, platform_size=4.)
         
@@ -155,3 +162,34 @@ def pit_terrain(terrain, depth, platform_size=1.):
     y1 = terrain.width // 2 - platform_size
     y2 = terrain.width // 2 + platform_size
     terrain.height_field_raw[x1:x2, y1:y2] = -depth
+
+def moat_terrain(
+    terrain,
+    moat_depth=1.0,
+    moat_width=1.0,
+    platform_size=2.0
+):
+    depth = int(moat_depth / terrain.vertical_scale)
+
+    moat_width = int(moat_width / terrain.horizontal_scale)
+    platform_size = int(platform_size / terrain.horizontal_scale)
+
+    center_x = terrain.length // 2
+    center_y = terrain.width // 2
+
+    outer = platform_size + moat_width
+
+    # terreno normale
+    terrain.height_field_raw[:, :] = 0
+
+    # fossato
+    terrain.height_field_raw[
+        center_x-outer:center_x+outer,
+        center_y-outer:center_y+outer
+    ] = -depth
+
+    # piattaforma centrale
+    terrain.height_field_raw[
+        center_x-platform_size:center_x+platform_size,
+        center_y-platform_size:center_y+platform_size
+    ] = 0
