@@ -3,6 +3,7 @@ from numpy.random import choice
 from scipy import interpolate
 
 from isaacgym import terrain_utils
+import math
 from legged_gym.envs.base.legged_robot_config import LeggedRobotCfg
 
 class Terrain:
@@ -122,6 +123,14 @@ class Terrain:
                 pit_depth=1 * difficulty,
                 pit_size=3
             )
+        elif choice < self.proportions[9]:
+            random_box_terrain(
+                terrain,
+                box_height=0.6*difficulty,
+                box_size=(1.2, 1.2),
+                distance=1*difficulty + 0.1,
+                platform_size=2.0
+            )
         else:
             pit_terrain(terrain, depth=pit_depth, platform_size=4.)
         
@@ -219,3 +228,76 @@ def box_terrain(
         center_x - pit_size : center_x + pit_size,
         center_y - pit_size : center_y + pit_size
     ] = -depth
+    
+def random_box_terrain(
+    terrain,
+    box_height=0.5,
+    box_size=(1.0, 0.6),   # lunghezza x larghezza [m]
+    distance=2.0,          # distanza dal robot [m]
+    platform_size=2.0      # area centrale piatta per spawn robot
+    ):
+    """
+    Robot spawnato al centro.
+    Un box viene generato a distanza fissa e angolo random.
+    Il box ha orientamento random (yaw).
+    """
+
+    # conversioni in coordinate heightfield
+    h = int(box_height / terrain.vertical_scale)
+
+    box_length = int(box_size[0] / terrain.horizontal_scale)
+    box_width  = int(box_size[1] / terrain.horizontal_scale)
+
+    dist = int(distance / terrain.horizontal_scale)
+
+    platform = int(platform_size / terrain.horizontal_scale)
+
+    # terreno piatto
+    terrain.height_field_raw[:, :] = 0
+
+    center_x = terrain.length // 2
+    center_y = terrain.width // 2
+
+    # piattaforma centrale robot
+    terrain.height_field_raw[
+        center_x-platform:center_x+platform,
+        center_y-platform:center_y+platform
+    ] = 0
+
+    # angolo random posizione box
+    theta = np.random.uniform(0, 2*np.pi)
+
+    box_center_x = int(center_x + dist * np.cos(theta))
+    box_center_y = int(center_y + dist * np.sin(theta))
+
+    # orientamento random box
+    yaw = np.random.uniform(0, 2*np.pi)
+
+    # half sizes
+    hl = box_length / 2
+    hw = box_width / 2
+
+    # bounding box locale
+    x_min = int(box_center_x - box_length)
+    x_max = int(box_center_x + box_length)
+    y_min = int(box_center_y - box_width)
+    y_max = int(box_center_y + box_width)
+
+    cos_y = np.cos(yaw)
+    sin_y = np.sin(yaw)
+
+    # rasterizzazione rettangolo ruotato
+    for x in range(x_min, x_max):
+        for y in range(y_min, y_max):
+
+            dx = x - box_center_x
+            dy = y - box_center_y
+
+            # coordinate nel frame del box
+            local_x =  dx * cos_y + dy * sin_y
+            local_y = -dx * sin_y + dy * cos_y
+
+            if abs(local_x) <= hl and abs(local_y) <= hw:
+
+                if 0 <= x < terrain.length and 0 <= y < terrain.width:
+                    terrain.height_field_raw[x, y] = h
