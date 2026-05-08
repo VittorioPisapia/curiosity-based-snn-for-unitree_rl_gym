@@ -116,6 +116,12 @@ class Terrain:
                 moat_width=0.5,
                 platform_size=2.0
             )
+        elif choice < self.proportions[8]:
+            box_terrain(
+                terrain,
+                pit_depth=1 * difficulty,
+                pit_size=3
+            )
         else:
             pit_terrain(terrain, depth=pit_depth, platform_size=4.)
         
@@ -193,3 +199,23 @@ def moat_terrain(
         center_x-platform_size:center_x+platform_size,
         center_y-platform_size:center_y+platform_size
     ] = 0
+
+def box_terrain(
+    terrain,
+    pit_depth=1.0,
+       pit_size=2.0
+    ):
+    # profondità in unità heightfield
+    depth = int(pit_depth / terrain.vertical_scale)
+
+    # dimensione area centrale
+    pit_size = int(pit_size / terrain.horizontal_scale)
+    center_x = terrain.length // 2
+    center_y = terrain.width // 2
+    # terreno normale
+    terrain.height_field_raw[:, :] = 0
+    # quadrato centrale scavato
+    terrain.height_field_raw[
+        center_x - pit_size : center_x + pit_size,
+        center_y - pit_size : center_y + pit_size
+    ] = -depth
