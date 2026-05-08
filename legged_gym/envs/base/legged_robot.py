@@ -40,6 +40,7 @@ class LeggedRobot(BaseTask):
         self.init_done = False
         self._parse_cfg(self.cfg)
         super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
+        self.goal_threshold = 0.3
 
         if not self.headless:
             self.set_camera(self.cfg.viewer.pos, self.cfg.viewer.lookat)
@@ -119,6 +120,7 @@ class LeggedRobot(BaseTask):
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
         self.last_root_vel[:] = self.root_states[:, 7:13]
+        self.prev_base_pos[:] = self.base_pos[:]
 
     def check_termination(self):
         """ Check if environments need to be reset
@@ -127,6 +129,9 @@ class LeggedRobot(BaseTask):
         self.reset_buf |= torch.logical_or(torch.abs(self.rpy[:,1])>1.0, torch.abs(self.rpy[:,0])>0.8)
         self.time_out_buf = self.episode_length_buf > self.max_episode_length # no terminal reward for time-outs
         self.reset_buf |= self.time_out_buf
+        goal_dist = torch.norm(self.goal_pos - self.base_pos[:, :2], dim=1)
+
+        self.reset_buf |= goal_dist < 0.3
 
     def reset_idx(self, env_ids):
         """ Reset some environments.
@@ -151,9 +156,23 @@ class LeggedRobot(BaseTask):
         self._reset_dofs(env_ids)
         self._reset_root_states(env_ids)
 
-        self._resample_commands(env_ids)
         mean_cot = self.episode_cot_sum[env_ids] / self.episode_length_buf[env_ids]
+        offset = torch_rand_float(-5, 5, (len(env_ids), 2), device=self.device)
 
+        dist = torch.norm(offset, dim=1, keepdim=True)
+
+        # evita divisione per zero
+        dist = torch.clamp(dist, min=1e-6)
+
+        # normalizza direzione
+        direction = offset / dist
+
+        # campiona distanza tra 3 e 5 metri
+        rand_dist = torch_rand_float(3.0, 5.0, (len(env_ids), 1), device=self.device)
+
+        offset = direction * rand_dist
+
+        self.goal_pos[env_ids] = self.env_origins[env_ids, :2] + offset
 
         self.episode_cot_sum[env_ids] = 0.0
 
@@ -203,10 +222,12 @@ class LeggedRobot(BaseTask):
     def compute_observations(self):
         """ Computes observations
         """
+        goal_error = self.goal_pos - self.base_pos[:, :2]
+
         self.obs_buf = torch.cat((  self.base_lin_vel * self.obs_scales.lin_vel,
                                     self.base_ang_vel  * self.obs_scales.ang_vel,
                                     self.projected_gravity,
-                                    self.commands[:, :3] * self.commands_scale,
+                                    goal_error,
                                     (self.dof_pos - self.default_dof_pos) * self.obs_scales.dof_pos,
                                     self.dof_vel * self.obs_scales.dof_vel,
                                     self.actions
@@ -315,29 +336,10 @@ class LeggedRobot(BaseTask):
         """ Callback called before computing terminations, rewards, and observations
             Default behaviour: Compute ang vel command based on target and heading, compute measured terrain heights and randomly push robots
         """
-        # 
-        env_ids = (self.episode_length_buf % int(self.cfg.commands.resampling_time / self.dt)==0).nonzero(as_tuple=False).flatten()
-        self._resample_commands(env_ids)
-        if self.cfg.commands.heading_command:
-            forward = quat_apply(self.base_quat, self.forward_vec)
-            heading = torch.atan2(forward[:, 1], forward[:, 0])
-            self.commands[:, 2] = torch.clip(0.5*wrap_to_pi(self.commands[:, 3] - heading), -1., 1.)
-
-    def _resample_commands(self, env_ids):
-        """ Randommly select commands of some environments
-
-        Args:
-            env_ids (List[int]): Environments ids for which new commands are needed
-        """
-        self.commands[env_ids, 0] = torch_rand_float(self.command_ranges["lin_vel_x"][0], self.command_ranges["lin_vel_x"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        self.commands[env_ids, 1] = torch_rand_float(self.command_ranges["lin_vel_y"][0], self.command_ranges["lin_vel_y"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        if self.cfg.commands.heading_command:
-            self.commands[env_ids, 3] = torch_rand_float(self.command_ranges["heading"][0], self.command_ranges["heading"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-        else:
-            self.commands[env_ids, 2] = torch_rand_float(self.command_ranges["ang_vel_yaw"][0], self.command_ranges["ang_vel_yaw"][1], (len(env_ids), 1), device=self.device).squeeze(1)
-
-        # set small commands to zero
-        self.commands[env_ids, :2] *= (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1)
+        if self.cfg.terrain.measure_heights:
+            self.measured_heights = self._get_heights()
+        if self.cfg.domain_rand.push_robots and  (self.common_step_counter % self.cfg.domain_rand.push_interval == 0):
+            self._push_robots()
 
     def _compute_torques(self, actions):
         """ Compute torques from actions.
@@ -430,17 +432,6 @@ class LeggedRobot(BaseTask):
                                                     gymtorch.unwrap_tensor(env_ids_int32), len(env_ids_int32))
 
    
-    
-    def update_command_curriculum(self, env_ids):
-        """ Implements a curriculum of increasing commands
-
-        Args:
-            env_ids (List[int]): ids of environments being reset
-        """
-        # If the tracking reward is above 80% of the maximum, increase the range of commands
-        if torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_lin_vel"]:
-            self.command_ranges["lin_vel_x"][0] = np.clip(self.command_ranges["lin_vel_x"][0] - 0.5, -self.cfg.commands.max_curriculum, 0.)
-            self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.5, 0., self.cfg.commands.max_curriculum)
 
     def _update_terrain_curriculum(self, env_ids):
         """ Implements the game-inspired curriculum.
@@ -452,11 +443,15 @@ class LeggedRobot(BaseTask):
         if not self.init_done:
             # don't change on initial reset
             return
-        distance = torch.norm(self.root_states[env_ids, :2] - self.env_origins[env_ids, :2], dim=1)
-        # robots that walked far enough progress to harder terains
-        move_up = distance > self.terrain.env_length / 2
-        # robots that walked less than half of their required distance go to simpler terrains
-        move_down = (distance < torch.norm(self.commands[env_ids, :2], dim=1)*self.max_episode_length_s*0.5) * ~move_up
+        goal_dist = torch.norm(
+            self.goal_pos[env_ids] - self.base_pos[env_ids, :2],
+            dim=1
+        )
+
+        goal_reached = goal_dist < self.goal_threshold
+
+        move_up = goal_reached
+        move_down = ~goal_reached
         self.terrain_levels[env_ids] += 1 * move_up - 1 * move_down
         # Robots that solve the last level are sent to a random one
         self.terrain_levels[env_ids] = torch.where(self.terrain_levels[env_ids]>=self.max_terrain_level,
@@ -478,7 +473,7 @@ class LeggedRobot(BaseTask):
             3 +   # lin vel
             3 +   # ang vel
             3 +   # gravity
-            3 +   # commands
+            2 +   # commands
             self.num_dof +   # dof pos
             self.num_dof +   # dof vel
             self.num_actions  # actions
@@ -568,6 +563,8 @@ class LeggedRobot(BaseTask):
         if self.cfg.terrain.measure_heights:
             self.height_points = self._init_height_points()
         self.measured_heights = 0
+        self.goal_pos = torch.zeros(self.num_envs, 2, device=self.device)
+        self.prev_base_pos = torch.zeros_like(self.base_pos)
 
         # joint positions offsets and PD gains
         self.default_dof_pos = torch.zeros(self.num_dof, dtype=torch.float, device=self.device, requires_grad=False)
@@ -777,7 +774,6 @@ class LeggedRobot(BaseTask):
         self.dt = self.cfg.control.decimation * self.sim_params.dt
         self.obs_scales = self.cfg.normalization.obs_scales
         self.reward_scales = class_to_dict(self.cfg.rewards.scales)
-        self.command_ranges = class_to_dict(self.cfg.commands.ranges)
         if self.cfg.terrain.mesh_type not in ['heightfield', 'trimesh']:
             self.cfg.terrain.curriculum = False
         self.max_episode_length_s = self.cfg.env.episode_length_s
@@ -965,3 +961,16 @@ class LeggedRobot(BaseTask):
         foot_velocities_xy = torch.norm(foot_velocities[:, :, :2], dim=2)
         contact = self.contact_forces[:, self.feet_indices, 2] > 1.0
         return torch.sum(contact * foot_velocities_xy, dim=1)
+    
+    def _reward_goal_progress(self):
+        prev_dist = torch.norm(self.goal_pos - self.prev_base_pos[:, :2], dim=1)
+        curr_dist = torch.norm(self.goal_pos - self.base_pos[:, :2], dim=1)
+
+        return prev_dist - curr_dist
+    
+    def _reward_goal_distance(self):
+        dx = self.goal_pos[:, 0] - self.base_pos[:, 0]
+        dy = self.goal_pos[:, 1] - self.base_pos[:, 1]
+        dist = torch.sqrt(dx**2 + dy**2)
+
+        return torch.exp(-dist / 2.0)   # reward alta se sei vicino

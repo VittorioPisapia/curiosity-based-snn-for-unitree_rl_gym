@@ -114,7 +114,7 @@ class Terrain:
             moat_terrain(
                 terrain,
                 moat_depth=1.0,
-                moat_width=0.5,
+                moat_width=1.0*difficulty,
                 platform_size=2.0
             )
         elif choice < self.proportions[8]:
