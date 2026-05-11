@@ -33,9 +33,9 @@ def play(args):
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = True
-    env_cfg.noise.add_noise = True
+    env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.push_robots = True
+    env_cfg.domain_rand.push_robots = False
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1
     if RANDOM:
@@ -201,7 +201,7 @@ def play(args):
         mean_cot= sum(log_cot_val)/len(log_cot_val)
 
         gait_matrix = np.array(log_contacts).T
-        
+
         fig, axs = plt.subplots(7, 1, figsize=(12, 12))
         fig.suptitle(f"Run Seed: {env_cfg.seed}", fontsize=14)
       
