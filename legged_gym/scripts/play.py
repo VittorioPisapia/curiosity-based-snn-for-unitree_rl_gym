@@ -167,8 +167,14 @@ def play(args):
 
     if len(log_cmd_vel_x) > 0:
         print(f"Plotting {len(log_cmd_vel_x)} steps of simulation...")
-             
+        cot_array = np.array(log_cot_val)    
         time_axis = np.arange(len(log_cmd_vel_x)) * env.dt
+        mask_3s = time_axis >= 3.0
+
+        if np.any(mask_3s):
+            mean_cot_3s = np.mean(cot_array[mask_3s])
+        else:
+            mean_cot_3s = np.nan  # o 0, se preferisci
         mean_cot= sum(log_cot_val)/len(log_cot_val)
 
         fig, axs = plt.subplots(6, 1, figsize=(12, 12))
@@ -216,7 +222,9 @@ def play(args):
         axs[4].grid(True)
 
         axs[5].plot(time_axis, log_cot_val, 'm', label='COT')
-        axs[5].set_title(f'Cost of Transport (Mean: {mean_cot:.4f})')
+        axs[5].set_title(
+                f'COT (mean total: {mean_cot:.4f} | mean t≥3s: {mean_cot_3s:.4f})'
+            )
         axs[5].set_xlabel('Time (s)')
         axs[5].set_ylabel('COT')
         axs[5].legend(loc='upper right')
