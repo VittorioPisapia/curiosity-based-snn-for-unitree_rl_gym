@@ -61,7 +61,7 @@ class ICM(nn.Module):
         encoded_state = self.encoder_model(state)
         return encoded_state
 
-class RND(nn.Module):
+class RND(nn.Module): #old, use rnd file
     def __init__(
             self,
             num_obs,
