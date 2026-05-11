@@ -15,8 +15,8 @@ import torch
 
 import matplotlib.pyplot as plt
 
-STRAIGHT = True
-RANDOM = False
+STRAIGHT = False
+RANDOM = True
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)

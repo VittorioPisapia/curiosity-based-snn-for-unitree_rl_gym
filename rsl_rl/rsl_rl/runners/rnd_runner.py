@@ -89,7 +89,16 @@ class RndRunner ( SnnRunner ):
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
-                    obs_for_rnd = torch.cat((obs[:, :9], obs[:, 12:-(12)]), dim=-1) # No actions, no commands, no heights (add +187)
+                    obs_lin_vel    = obs[:, 0:3]
+                    obs_ang_vel    = obs[:, 3:6]
+                    obs_proj_grav  = obs[:, 6:9]
+                    obs_commands   = obs[:, 9:12]
+                    obs_dof_pos    = obs[:, 12:24]
+                    obs_dof_vel    = obs[:, 24:36]
+                    obs_last_act   = obs[:, 36:48] 
+
+                    obs_for_rnd = torch.cat((obs_lin_vel,obs_dof_pos,obs_dof_vel), dim=-1)
+                    #obs_for_rnd = torch.cat((obs[:, :9], obs[:, 12:-(12)]), dim=-1)  # No actions, no commands, no heights (add +187)
                     normalized_state = self.normalizer(obs_for_rnd)
                     intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(normalized_state) if self.use_rnd else None
 
