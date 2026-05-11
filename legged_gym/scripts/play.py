@@ -16,7 +16,7 @@ import numpy as np
 
 from legged_gym.utils.recorder import VideoRecorder
 from legged_gym.utils.play_logger import RobotLogger
-from legged_gym.utils.plotting import plot_run
+from legged_gym.utils.plotting import plot_run, show_plot
 
 
 def play(args):
@@ -97,7 +97,7 @@ def play(args):
         recorder = VideoRecorder(env, video_path)
 
     try:
-        for i in range(700):
+        for _ in range(700):
         #for i in range(10*int(env.max_episode_length)):
             actions = policy(obs.detach())
             obs, _, rews, dones, infos = env.step(actions.detach())
@@ -148,6 +148,7 @@ def play(args):
 
             print(f"Plots saved in : {plot_path}")
 
+        show_plot()
 
     else:
         print("No data collected.")

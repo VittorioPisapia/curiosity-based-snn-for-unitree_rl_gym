@@ -297,3 +297,6 @@ def plot_run(logger, env, env_cfg):
     plt.tight_layout()
 
     return fig
+
+def show_plot():
+    plt.show()
