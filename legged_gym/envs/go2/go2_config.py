@@ -48,7 +48,7 @@ class GO2RoughCfg( LeggedRobotCfg ):
             # New
             base_height = -10
             feet_air_time = 0.01
-            action_rate = -0.04
+            action_rate = -0.02
             slip = -0.01
             cost_of_transport = -0.1 # -0.05 ~ -0.2
 
