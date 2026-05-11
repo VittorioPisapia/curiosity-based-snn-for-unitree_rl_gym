@@ -17,4 +17,4 @@ class GO2RoughRNDCfgPPO( GO2RoughSNNCfgPPO):
             predictor_hidden_dims = [32, 32]
             target_hidden_dims = [32]
             learning_rate = 1.e-4
-            weight = 0.00008
+            weight = 0.0001
