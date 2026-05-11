@@ -156,6 +156,7 @@ def get_args():
         {"name": "--checkpoint", "type": int,  "help": "Saved model checkpoint number. If -1: will load the last checkpoint. Overrides config file if provided."},
         
         {"name": "--cmd_type", "type": str, "default": "normal", "help": "Choose between velocity only on x direction or random."},
+        {"name": "--push", "action": "store_true", "default": False, "help": "Push the robot during play"},
         {"name": "--headless", "action": "store_true", "default": False, "help": "Force display off at all times"},
         {"name": "--record", "action": "store_true", "default": False, "help": "Record frames during evaluation and save as video"},
         {"name": "--plot", "action": "store_true", "default": False, "help": "Save plots"}, 

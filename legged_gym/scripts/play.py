@@ -1,7 +1,7 @@
 from legged_gym import LEGGED_GYM_ROOT_DIR
 import os
-import sys
-import imageio
+
+
 import isaacgym
 from isaacgym import gymapi
 import random
@@ -12,9 +12,11 @@ from legged_gym.utils.helpers import  configure_commands
 from datetime import datetime
 
 import numpy as np
-import torch
 
-import matplotlib.pyplot as plt
+
+from legged_gym.utils.recorder import VideoRecorder
+from legged_gym.utils.play_logger import RobotLogger
+from legged_gym.utils.plotting import plot_run
 
 
 def play(args):
@@ -36,11 +38,12 @@ def play(args):
     env_cfg.terrain.curriculum = True
     env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.push_robots = False
+    env_cfg.domain_rand.push_robots = args.push
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1
 
     configure_commands(env_cfg, command_mode)
+    timestamp = datetime.now().strftime('%b%d_%H-%M-%S')
 
     env_cfg.env.test = True
 
@@ -56,21 +59,8 @@ def play(args):
     ppo_runner, train_cfg = task_registry.make_alg_runner(env=env, name=args.task, args=args, train_cfg=train_cfg)
     policy = ppo_runner.get_inference_policy(device=env.device)
 
-       
-    log_cmd_vel_x, log_act_vel_x = [], []
-    log_cmd_vel_y, log_act_vel_y = [], []
-    log_cmd_yaw, log_act_yaw = [], []   
-    log_target_z, log_actual_z = [], []
-    log_foot_FL_x, log_foot_FL_y = [], []
-    log_foot_FL_z, log_foot_FR_z, log_foot_RL_z, log_foot_RR_z = [], [], [], []
-    foot_idx_FL = env.feet_indices[0]
-    foot_idx_FR = env.feet_indices[1] 
-    foot_idx_RL = env.feet_indices[2] 
-    foot_idx_RR = env.feet_indices[3] 
     robot_idx = 0 
-    target_base_height = env.cfg.rewards.base_height_target
-    log_cot_val = []
-    log_contacts = []
+    logger = RobotLogger()
     
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
@@ -78,30 +68,33 @@ def play(args):
         export_policy_as_jit(ppo_runner.alg.actor_critic, path)
         print('Exported policy as jit script to: ', path)
 
+    recorder = None
+
     if args.record:
 
-        experiment_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)     
-        model_path = get_load_path(root=experiment_root, 
-                                   load_run=args.load_run, 
-                                   checkpoint=args.checkpoint)
+        experiment_root = os.path.join(
+            LEGGED_GYM_ROOT_DIR,
+            'logs',
+            train_cfg.runner.experiment_name
+        )
+
+        model_path = get_load_path(
+            root=experiment_root,
+            load_run=args.load_run,
+            checkpoint=args.checkpoint
+        )
+
         experiment_dir = os.path.dirname(model_path)
+
         video_dir = os.path.join(experiment_dir, 'videos')
         os.makedirs(video_dir, exist_ok=True)
-        timestamp = datetime.now().strftime('%b%d_%H-%M-%S')
-        video_path = os.path.join(video_dir, f"{timestamp}_seed_{env_cfg.seed}_.mp4")
 
-        camera_props = gymapi.CameraProperties()
-        camera_props.width = 1280
-        camera_props.height = 720
-        camera_handle = env.gym.create_camera_sensor(env.envs[0], camera_props)
-        
-        camera_position = gymapi.Vec3(4.0, 4.0, 3.0)
-        camera_target = gymapi.Vec3(0.0, 0.0, 0.5)
-        env.gym.set_camera_location(camera_handle, env.envs[0], camera_position, camera_target)
-        
-        video_writer = imageio.get_writer(video_path, fps=50)
-        print("Starting video recording...")
-        print(f"Video will be saved to: {video_path}")
+        video_path = os.path.join(
+            video_dir,
+            f"{timestamp}_seed_{env_cfg.seed}.mp4"
+        )
+
+        recorder = VideoRecorder(env, video_path)
 
     try:
         for i in range(700):
@@ -109,170 +102,58 @@ def play(args):
             actions = policy(obs.detach())
             obs, _, rews, dones, infos = env.step(actions.detach())
             env.gym.refresh_rigid_body_state_tensor(env.sim)
-            contacts = (
-                env.contact_forces[robot_idx, env.feet_indices, 2] > 1.0
-            ).cpu().numpy()
 
-            log_contacts.append(contacts)
+            logger.log_step(env, robot_idx)
 
-            log_cmd_vel_x.append(env.commands[robot_idx, 0].item())
-            log_act_vel_x.append(env.base_lin_vel[robot_idx, 0].item())
-
-            log_cmd_vel_y.append(env.commands[robot_idx, 1].item())
-            log_act_vel_y.append(env.base_lin_vel[robot_idx, 1].item())
-
-            log_cmd_yaw.append(env.commands[robot_idx, 2].item())
-            log_act_yaw.append(env.base_ang_vel[robot_idx, 2].item())
-
-            log_target_z.append(target_base_height)
-            log_actual_z.append(env.root_states[robot_idx, 2].item())
-
-            foot_pos1 = env.rigid_body_states[robot_idx, foot_idx_FL, 0:3].cpu().numpy()
-            log_foot_FL_x.append(foot_pos1[0])
-            log_foot_FL_y.append(foot_pos1[1])
-            log_foot_FL_z.append(foot_pos1[2])
-            log_foot_FR_z.append(env.rigid_body_states[robot_idx, foot_idx_FR, 2].cpu().numpy())
-            log_foot_RL_z.append(env.rigid_body_states[robot_idx, foot_idx_RL, 2].cpu().numpy())
-            log_foot_RR_z.append(env.rigid_body_states[robot_idx, foot_idx_RR, 2].cpu().numpy())
-
-            current_cot_val = env.current_cot[0].item() 
-            #print(f"Step {i}: COT = {current_cot_val:.4f}")
-            log_cot_val.append(current_cot_val)
-
-            if args.record:
-                        robot_pos = env.root_states[0, :3].cpu().numpy()
-                        env_origin = env.gym.get_env_origin(env.envs[0])
-                        local_x = robot_pos[0] - env_origin.x
-                        local_y = robot_pos[1] - env_origin.y
-                        local_z = robot_pos[2] - env_origin.z
-                        
-                        cam_pos = gymapi.Vec3(local_x + 2.0, local_y + 2.0, local_z + 1.0)
-                        cam_target = gymapi.Vec3(local_x, local_y, local_z)
-                        env.gym.set_camera_location(camera_handle, env.envs[0], cam_pos, cam_target)
-                        
-                        env.gym.fetch_results(env.sim, True)
-
-                        env.gym.step_graphics(env.sim)
-                        env.gym.render_all_camera_sensors(env.sim)
-                        
-                        image = env.gym.get_camera_image(env.sim, env.envs[0], camera_handle, gymapi.IMAGE_COLOR)
-                        image_np = image.reshape((camera_props.height, camera_props.width, 4))
-                        rgb_image = image_np[..., :3] 
-                        
-                        video_writer.append_data(rgb_image)
+            if recorder:
+                recorder.capture_frame()
     
     except KeyboardInterrupt:
         
         print("\nSimulation stopped by user! Generating plots...")
-
-
-    if len(log_cmd_vel_x) > 0:
-
-        print(f"Plotting {len(log_cmd_vel_x)} steps of simulation...")
-        cot_array = np.array(log_cot_val)    
-        time_axis = np.arange(len(log_cmd_vel_x)) * env.dt
-        mask_3s = time_axis >= 3.0
-
-        if np.any(mask_3s):
-            mean_cot_3s = np.mean(cot_array[mask_3s])
-        else:
-            mean_cot_3s = np.nan  
-
-        mean_cot= sum(log_cot_val)/len(log_cot_val)
-
-        gait_matrix = np.array(log_contacts).T
-
-        fig, axs = plt.subplots(7, 1, figsize=(12, 12))
-        fig.suptitle(f"Run Seed: {env_cfg.seed}", fontsize=14)
-      
-        axs[0].plot(time_axis, log_cmd_vel_x, 'r--', label='Cmd Lin X')
-        axs[0].plot(time_axis, log_act_vel_x, 'r', label='Act Lin X')
-        axs[0].plot(time_axis, log_cmd_vel_y, 'g--', label='Cmd Lin Y')
-        axs[0].plot(time_axis, log_act_vel_y, 'g', label='Act Lin Y')
-        axs[0].set_title('Commanded vs Actual Linear Velocities')
-        axs[0].set_ylabel('Velocity (m/s or rad/s)')
-        axs[0].legend(loc='upper right', ncol=3)
-        axs[0].grid(True)
-
-        axs[1].plot(time_axis, log_cmd_yaw, 'b--', label='Cmd Ang Z (Yaw)')
-        axs[1].plot(time_axis, log_act_yaw, 'b', label='Act Ang Z (Yaw)')
-        axs[1].set_title('Commanded vs Actual Angular Velocities')
-        axs[1].set_ylabel('Angular Velocity (rad/s)')
-        axs[1].legend(loc='upper right', ncol=3)
-        axs[1].grid(True)
-        
-        axs[2].plot(time_axis, log_target_z, 'k--', label='Target Height')
-        axs[2].plot(time_axis, log_actual_z, 'k', label='Actual Height')
-        axs[2].set_title('Base Height (Z)')
-        axs[2].set_ylabel('Height (m)')
-        axs[2].legend(loc='upper right')
-        axs[2].grid(True)
     
-        axs[3].plot(time_axis, log_foot_FL_x, 'r', label='Foot X')
-        axs[3].plot(time_axis, log_foot_FL_y, 'g', label='Foot Y')
-        axs[3].set_title('Global Position of Individual Foot')
-        axs[3].set_xlabel('Time (s)')
-        axs[3].set_ylabel('Position (m)')
-        axs[3].legend(loc='upper right')
-        axs[3].grid(True)
-        
-        axs[4].plot(time_axis, log_foot_FL_z, 'r', label='Foot FL_Z')
-        axs[4].plot(time_axis, log_foot_FR_z, 'g', label='Foot FR_Z')
-        axs[4].plot(time_axis, log_foot_RL_z, 'b', label='Foot RL_Z')
-        axs[4].plot(time_axis, log_foot_RR_z, 'y', label='Foot RR_Z')
-        axs[4].set_title('Height')
-        axs[4].set_xlabel('Time (s)')
-        axs[4].set_ylabel('Position (m)')
-        axs[4].legend(loc='upper right')
-        axs[4].grid(True)
 
-        axs[5].plot(time_axis, log_cot_val, 'm', label='COT')
-        axs[5].set_title(
-                f'COT (mean total: {mean_cot:.4f} | mean t≥3s: {mean_cot_3s:.4f})'
-            )
-        axs[5].set_xlabel('Time (s)')
-        axs[5].set_ylabel('COT')
-        axs[5].legend(loc='upper right')
-        axs[5].grid(True)
+    if logger.has_data():
 
-        axs[6].imshow(
-            gait_matrix,
-            aspect='auto',
-            cmap='binary',
-            interpolation='nearest',
-            extent=[0, len(log_contacts)*env.dt, 4, 0]
-        )
+        print(f"Plotting {logger.num_steps} steps of simulation...")
 
-        axs[6].set_yticks([0.5, 1.5, 2.5, 3.5])
-        axs[6].set_yticklabels(['FL', 'FR', 'RL', 'RR'])
+        fig = plot_run(logger, env, env_cfg)
 
-        axs[6].set_title('Gait Diagram')
-        axs[6].set_xlabel('Time (s)')
-        axs[6].set_ylabel('Feet')
-
-        plt.tight_layout()
         if args.plot:
-            experiment_root = os.path.join(LEGGED_GYM_ROOT_DIR, 'logs', train_cfg.runner.experiment_name)     
-            model_path = get_load_path(root=experiment_root, 
-                                    load_run=args.load_run, 
-                                    checkpoint=args.checkpoint)
-            experiment_dir = os.path.dirname(model_path) 
+
+            experiment_root = os.path.join(
+                LEGGED_GYM_ROOT_DIR,
+                'logs',
+                train_cfg.runner.experiment_name
+            )
+
+            model_path = get_load_path(
+                root=experiment_root,
+                load_run=args.load_run,
+                checkpoint=args.checkpoint
+            )
+
+            experiment_dir = os.path.dirname(model_path)
+
             plots_dir = os.path.join(experiment_dir, 'plots')
+
             os.makedirs(plots_dir, exist_ok=True)
-            plot_path = os.path.join(plots_dir, f"{timestamp}_seed_{env_cfg.seed}.png")
-            plt.savefig(plot_path, dpi=300) 
+
+            plot_path = os.path.join(
+                plots_dir,
+                f"{timestamp}_seed_{env_cfg.seed}.png"
+            )
+
+            fig.savefig(plot_path, dpi=300)
+
             print(f"Plots saved in : {plot_path}")
-        
-        if not getattr(args, 'headless', False):
-            plt.show()
-        
+
 
     else:
         print("No data collected.")
 
-    if args.record:
-        video_writer.close()
-        print("Saved video successfully")
+    if recorder:
+        recorder.close()
 
 if __name__ == '__main__':
     EXPORT_POLICY = True
