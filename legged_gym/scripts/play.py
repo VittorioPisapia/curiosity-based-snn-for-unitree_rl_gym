@@ -16,6 +16,7 @@ import torch
 import matplotlib.pyplot as plt
 
 STRAIGHT = True
+RANDOM = False
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
@@ -24,6 +25,7 @@ def play(args):
     # override some parameters for testing
     if args.seed is not None:
         env_cfg.seed = args.seed
+        np.random.seed(args.seed)
     if args.num_envs is None:
         env_cfg.env.num_envs = 1
     else:
@@ -37,12 +39,25 @@ def play(args):
     env_cfg.domain_rand.push_robots = False
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1.5
-    if STRAIGHT:
+    if RANDOM:
+        
+        x_vel = np.random.uniform(-1,1)
+        y_vel = np.random.uniform(-1,1)
+        yaw_vel = np.random.uniform(-1,1)
+        heading = np.random.uniform(-3.14,3.14)
+
+        env_cfg.commands.ranges.lin_vel_x=[x_vel,x_vel]
+        env_cfg.commands.ranges.lin_vel_y=[y_vel, y_vel]
+        env_cfg.commands.ranges.ang_vel_yaw=[yaw_vel, yaw_vel]
+        env_cfg.commands.ranges.heading=[heading,heading]
+    elif STRAIGHT:
+
         env_cfg.commands.ranges.lin_vel_x=[1,1]
         env_cfg.commands.ranges.lin_vel_y=[0, 0]
         env_cfg.commands.ranges.ang_vel_yaw=[0, 0]
         env_cfg.commands.ranges.heading=[0,0]
     else:
+
         env_cfg.commands.ranges.lin_vel_x=[-1,1]
         env_cfg.commands.ranges.lin_vel_y=[-1, 1]
         env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
