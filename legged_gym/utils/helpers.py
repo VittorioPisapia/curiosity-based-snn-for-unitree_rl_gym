@@ -119,6 +119,33 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
 
     return env_cfg, cfg_train
 
+def configure_commands(env_cfg, mode):
+    if mode == "straight":
+        env_cfg.commands.ranges.lin_vel_x = [1.0, 1.0]
+        env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
+        env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
+        env_cfg.commands.ranges.heading = [0.0, 0.0]
+
+    elif mode == "random":
+        x_vel = np.random.uniform(-1, 1)
+        y_vel = np.random.uniform(-1, 1)
+        yaw_vel = np.random.uniform(-1, 1)
+        heading = np.random.uniform(-np.pi, np.pi)
+
+        env_cfg.commands.ranges.lin_vel_x = [x_vel, x_vel]
+        env_cfg.commands.ranges.lin_vel_y = [y_vel, y_vel]
+        env_cfg.commands.ranges.ang_vel_yaw = [yaw_vel, yaw_vel]
+        env_cfg.commands.ranges.heading = [heading, heading]
+
+    elif mode == "normal":
+        x_vel = np.random.uniform(-1,1)
+        y_vel = np.random.uniform(-1,1)
+        yaw_vel = np.random.uniform(-1,1)
+        heading = np.random.uniform(-3.14,3.14)
+
+    else:
+        raise ValueError(f"Unknown command mode: {mode}")
+
 def get_args():
     custom_parameters = [
         {"name": "--task", "type": str, "default": "go2", "help": "Resume training or start testing from a checkpoint. Overrides config file if provided."},
@@ -128,6 +155,7 @@ def get_args():
         {"name": "--load_run", "type": str,  "help": "Name of the run to load when resume=True. If -1: will load the last run. Overrides config file if provided."},
         {"name": "--checkpoint", "type": int,  "help": "Saved model checkpoint number. If -1: will load the last checkpoint. Overrides config file if provided."},
         
+        {"name": "--cmd_type", "type": str, "default": "normal", "help": "Choose between velocity only on x direction or random."},
         {"name": "--headless", "action": "store_true", "default": False, "help": "Force display off at all times"},
         {"name": "--record", "action": "store_true", "default": False, "help": "Record frames during evaluation and save as video"},
         {"name": "--plot", "action": "store_true", "default": False, "help": "Save plots"}, 

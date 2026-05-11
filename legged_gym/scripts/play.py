@@ -8,6 +8,7 @@ import random
 
 from legged_gym.envs import *
 from legged_gym.utils import  get_args, export_policy_as_jit, task_registry, Logger, get_load_path, set_seed
+from legged_gym.utils.helpers import  configure_commands
 from datetime import datetime
 
 import numpy as np
@@ -15,8 +16,6 @@ import torch
 
 import matplotlib.pyplot as plt
 
-STRAIGHT = True
-RANDOM = False
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
@@ -29,7 +28,9 @@ def play(args):
         env_cfg.env.num_envs = 1
     else:
         env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
-        
+    
+    command_mode = args.cmd_type
+
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = True
@@ -38,29 +39,8 @@ def play(args):
     env_cfg.domain_rand.push_robots = False
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1
-    if RANDOM:
-        
-        x_vel = np.random.uniform(-1,1)
-        y_vel = np.random.uniform(-1,1)
-        yaw_vel = np.random.uniform(-1,1)
-        heading = np.random.uniform(-3.14,3.14)
 
-        env_cfg.commands.ranges.lin_vel_x=[x_vel,x_vel]
-        env_cfg.commands.ranges.lin_vel_y=[y_vel, y_vel]
-        env_cfg.commands.ranges.ang_vel_yaw=[yaw_vel, yaw_vel]
-        env_cfg.commands.ranges.heading=[heading,heading]
-    elif STRAIGHT:
-
-        env_cfg.commands.ranges.lin_vel_x=[1,1]
-        env_cfg.commands.ranges.lin_vel_y=[0, 0]
-        env_cfg.commands.ranges.ang_vel_yaw=[0, 0]
-        env_cfg.commands.ranges.heading=[0,0]
-    else:
-
-        env_cfg.commands.ranges.lin_vel_x=[-1,1]
-        env_cfg.commands.ranges.lin_vel_y=[-1, 1]
-        env_cfg.commands.ranges.ang_vel_yaw=[-1, 1]
-        env_cfg.commands.ranges.heading=[-3.14,3.14]
+    configure_commands(env_cfg, command_mode)
 
     env_cfg.env.test = True
 
