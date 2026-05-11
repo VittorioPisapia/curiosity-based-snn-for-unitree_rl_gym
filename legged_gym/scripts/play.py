@@ -15,12 +15,11 @@ import torch
 
 import matplotlib.pyplot as plt
 
-STRAIGHT = False
-RANDOM = True
+STRAIGHT = True
+RANDOM = False
 
 def play(args):
     env_cfg, train_cfg = task_registry.get_cfgs(name=args.task)
-    
     
     # override some parameters for testing
     if args.seed is not None:
@@ -34,11 +33,11 @@ def play(args):
     env_cfg.terrain.num_rows = 5
     env_cfg.terrain.num_cols = 5
     env_cfg.terrain.curriculum = True
-    env_cfg.noise.add_noise = False
+    env_cfg.noise.add_noise = True
     env_cfg.domain_rand.randomize_friction = False
-    env_cfg.domain_rand.push_robots = False
+    env_cfg.domain_rand.push_robots = True
     env_cfg.domain_rand.push_interval_s=5
-    env_cfg.domain_rand.max_push_vel_xy=1.5
+    env_cfg.domain_rand.max_push_vel_xy=1
     if RANDOM:
         
         x_vel = np.random.uniform(-1,1)
@@ -91,6 +90,7 @@ def play(args):
     robot_idx = 0 
     target_base_height = env.cfg.rewards.base_height_target
     log_cot_val = []
+    log_contacts = []
     
     # export policy as a jit module (used to run it from C++)
     if EXPORT_POLICY:
@@ -129,6 +129,11 @@ def play(args):
             actions = policy(obs.detach())
             obs, _, rews, dones, infos = env.step(actions.detach())
             env.gym.refresh_rigid_body_state_tensor(env.sim)
+            contacts = (
+                env.contact_forces[robot_idx, env.feet_indices, 2] > 1.0
+            ).cpu().numpy()
+
+            log_contacts.append(contacts)
 
             log_cmd_vel_x.append(env.commands[robot_idx, 0].item())
             log_act_vel_x.append(env.base_lin_vel[robot_idx, 0].item())
@@ -180,7 +185,9 @@ def play(args):
         
         print("\nSimulation stopped by user! Generating plots...")
 
+
     if len(log_cmd_vel_x) > 0:
+
         print(f"Plotting {len(log_cmd_vel_x)} steps of simulation...")
         cot_array = np.array(log_cot_val)    
         time_axis = np.arange(len(log_cmd_vel_x)) * env.dt
@@ -189,10 +196,13 @@ def play(args):
         if np.any(mask_3s):
             mean_cot_3s = np.mean(cot_array[mask_3s])
         else:
-            mean_cot_3s = np.nan  # o 0, se preferisci
+            mean_cot_3s = np.nan  
+
         mean_cot= sum(log_cot_val)/len(log_cot_val)
 
-        fig, axs = plt.subplots(6, 1, figsize=(12, 12))
+        gait_matrix = np.array(log_contacts).T
+        
+        fig, axs = plt.subplots(7, 1, figsize=(12, 12))
         fig.suptitle(f"Run Seed: {env_cfg.seed}", fontsize=14)
       
         axs[0].plot(time_axis, log_cmd_vel_x, 'r--', label='Cmd Lin X')
@@ -244,6 +254,21 @@ def play(args):
         axs[5].set_ylabel('COT')
         axs[5].legend(loc='upper right')
         axs[5].grid(True)
+
+        axs[6].imshow(
+            gait_matrix,
+            aspect='auto',
+            cmap='binary',
+            interpolation='nearest',
+            extent=[0, len(log_contacts)*env.dt, 4, 0]
+        )
+
+        axs[6].set_yticks([0.5, 1.5, 2.5, 3.5])
+        axs[6].set_yticklabels(['FL', 'FR', 'RL', 'RR'])
+
+        axs[6].set_title('Gait Diagram')
+        axs[6].set_xlabel('Time (s)')
+        axs[6].set_ylabel('Feet')
 
         plt.tight_layout()
         if args.plot:
