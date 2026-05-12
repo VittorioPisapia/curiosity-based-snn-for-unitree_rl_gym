@@ -36,7 +36,7 @@ class LeggedRobot(BaseTask):
         self.cfg = cfg
         self.sim_params = sim_params
         self.height_samples = None
-        self.debug_viz = False
+        self.debug_viz = True
         self.init_done = False
         self._parse_cfg(self.cfg)
         super().__init__(self.cfg, sim_params, physics_engine, sim_device, headless)
@@ -105,17 +105,18 @@ class LeggedRobot(BaseTask):
         # compute observations, rewards, resets, ...
         self.check_termination()
         self._compute_cot_metric()
+        if self.cfg.terrain.measure_heights:
+            self.measured_heights = self._get_heights()
         self.compute_reward()
         env_ids = self.reset_buf.nonzero(as_tuple=False).flatten()
         self.reset_idx(env_ids)
         
-        if self.cfg.terrain.measure_heights:
-            self.measured_heights = self._get_heights()
         if self.cfg.domain_rand.push_robots:
             self._push_robots()
 
         self.compute_observations() # in some cases a simulation step might be required to refresh some obs (for example body positions)
-
+        if self.viewer and self.debug_viz:
+            self._draw_debug_vis()
         self.last_actions[:] = self.actions[:]
         self.last_dof_vel[:] = self.dof_vel[:]
         self.last_root_vel[:] = self.root_states[:, 7:13]
