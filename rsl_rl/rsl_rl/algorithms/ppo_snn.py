@@ -7,11 +7,14 @@ from rsl_rl.storage.rollout_storage_snn import RolloutStorage_Snn
 from rsl_rl.algorithms.ppo import PPO
 from rsl_rl.modules.rnd import RandomNetworkDistillation
 from rsl_rl.modules.normalization import EmpiricalNormalization, EmpiricalDiscountedVariationNormalization
+from rsl_rl.modules.symmetry import DummyBatch, Symmetry
 
 class PPO_Snn (PPO):
     actor_critic: ActorCriticSNN
     def __init__(self,
                  actor_critic,
+                 use_symmetry,
+                 symmetry,
                  num_learning_epochs=1,
                  num_mini_batches=1,
                  clip_param=0.2,
@@ -39,6 +42,10 @@ class PPO_Snn (PPO):
         self.storage = None # initialized later
         self.optimizer = optim.Adam(self.actor_critic.parameters(), lr=learning_rate)
         self.transition = RolloutStorage_Snn.Transition()
+
+        # Symmetry
+        self.use_symmetry = use_symmetry
+        self.symmetry_module = Symmetry(**symmetry) if use_symmetry else None
 
         # PPO parameters
         self.clip_param = clip_param
@@ -89,6 +96,8 @@ class PPO_Snn (PPO):
         mean_value_loss = 0
         mean_surrogate_loss = 0
 
+        mean_symmetry_loss = 0 if self.use_symmetry else None
+
         if self.actor_critic.is_recurrent:
             generator = self.storage.reccurent_mini_batch_generator(self.num_mini_batches, self.num_learning_epochs)
         else:
@@ -96,19 +105,44 @@ class PPO_Snn (PPO):
         for obs_batch, critic_obs_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, old_actions_log_prob_batch, \
             old_mu_batch, old_sigma_batch, hid_states_batch, masks_batch in generator:
 
+                batch = DummyBatch(
+                    observations=obs_batch,
+                    actions=actions_batch,
+                    old_actions_log_prob=old_actions_log_prob_batch,
+                    values=target_values_batch,
+                    advantages=advantages_batch,
+                    returns=returns_batch
+                )
 
-                self.actor_critic.update_distribution(obs_batch, hidden_states=hid_states_batch)
-                actions_log_prob_batch = self.actor_critic.get_actions_log_prob(actions_batch)
+                original_size = obs_batch.shape[0]
+                if self.symmetry_module.use_data_augmentation:
+                    batch = self.symmetry_module.augment_batch(batch)
+
+                    num_aug = batch.observations.shape[0] // original_size
+                    if hid_states_batch is not None:
+                        hid_states_batch["snn_m"] = hid_states_batch["snn_m"].repeat(num_aug, 1)
+                        hid_states_batch["snn_s"] = hid_states_batch["snn_s"].repeat(num_aug, 1)
+                    
+                    if critic_obs_batch.shape[0] == original_size:
+                         critic_obs_batch = critic_obs_batch.repeat(num_aug, 1)
+
+                self.actor_critic.update_distribution(batch.observations, hidden_states=hid_states_batch)
+                actions_log_prob_batch = self.actor_critic.get_actions_log_prob(batch.actions)
                 value_batch = self.actor_critic.evaluate(critic_obs_batch)
                 mu_batch = self.actor_critic.action_mean
                 sigma_batch = self.actor_critic.action_std
                 entropy_batch = self.actor_critic.entropy
 
+                mu_batch_orig = mu_batch[:original_size]
+                sigma_batch_orig = sigma_batch[:original_size]
+                entropy_batch_orig = entropy_batch[:original_size]
+
+
                 # KL
                 if self.desired_kl != None and self.schedule == 'adaptive':
                     with torch.inference_mode():
                         kl = torch.sum(
-                            torch.log(sigma_batch / old_sigma_batch + 1.e-5) + (torch.square(old_sigma_batch) + torch.square(old_mu_batch - mu_batch)) / (2.0 * torch.square(sigma_batch)) - 0.5, axis=-1)
+                            torch.log(sigma_batch_orig / old_sigma_batch + 1.e-5) + (torch.square(old_sigma_batch) + torch.square(old_mu_batch - mu_batch_orig)) / (2.0 * torch.square(sigma_batch_orig)) - 0.5, axis=-1)
                         kl_mean = torch.mean(kl)
 
                         if kl_mean > self.desired_kl * 2.0:
@@ -121,24 +155,29 @@ class PPO_Snn (PPO):
 
 
                 # Surrogate loss
-                ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
-                surrogate = -torch.squeeze(advantages_batch) * ratio
-                surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(ratio, 1.0 - self.clip_param,
+                ratio = torch.exp(actions_log_prob_batch - torch.squeeze(batch.old_actions_log_prob))
+                surrogate = -torch.squeeze(batch.advantages) * ratio
+                surrogate_clipped = -torch.squeeze(batch.advantages) * torch.clamp(ratio, 1.0 - self.clip_param,
                                                                                 1.0 + self.clip_param)
                 surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
                 # Value function loss
                 if self.use_clipped_value_loss:
-                    value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param,
+                    value_clipped = batch.values + (value_batch - batch.values).clamp(-self.clip_param,
                                                                                                     self.clip_param)
-                    value_losses = (value_batch - returns_batch).pow(2)
-                    value_losses_clipped = (value_clipped - returns_batch).pow(2)
+                    value_losses = (value_batch - batch.returns).pow(2)
+                    value_losses_clipped = (value_clipped - batch.returns).pow(2)
                     value_loss = torch.max(value_losses, value_losses_clipped).mean()
                 else:
-                    value_loss = (returns_batch - value_batch).pow(2).mean()
+                    value_loss = (batch.returns - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch_orig.mean()
 
+                # Symmetry loss
+                if self.symmetry_module:
+                    symmetry_loss = self.symmetry_module.compute_loss(self.actor_critic.actor, batch, original_size)
+                    if self.symmetry_module.use_mirror_loss:
+                        loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -149,13 +188,17 @@ class PPO_Snn (PPO):
 
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()
+                if mean_symmetry_loss is not None:
+                    mean_symmetry_loss += symmetry_loss.item()
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
 
 
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates
+        if mean_symmetry_loss is not None:
+            mean_symmetry_loss /= num_updates
 
         self.storage.clear()
 
-        return mean_value_loss, mean_surrogate_loss
+        return mean_value_loss, mean_surrogate_loss, mean_symmetry_loss
