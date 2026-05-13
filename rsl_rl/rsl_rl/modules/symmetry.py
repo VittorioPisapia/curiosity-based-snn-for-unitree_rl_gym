@@ -29,13 +29,13 @@ class Symmetry:
 
     def augment_batch(self, batch: DummyBatch) -> DummyBatch:
         if not self.use_data_augmentation:
-            return
+            return batch
         
         original_batch_size = batch.observations.shape[0]
 
-        obs_aug, actions_aug = self.use_data_augmentation(env=self.env, obs=batch.observations, actions=batch.actions)
+        obs_aug, actions_aug = self.data_augmentation_func(env=self.env, obs=batch.observations, actions=batch.actions)
 
-        num_aug = int(obs_aug[0] / original_batch_size)
+        num_aug = int(obs_aug.shape[0] / original_batch_size)
 
         batch.observations = obs_aug
         batch.actions = actions_aug
@@ -44,28 +44,108 @@ class Symmetry:
         batch.values = batch.values.repeat(num_aug, 1)
         batch.advantages = batch.advantages.repeat(num_aug, 1)
         batch.returns = batch.returns.repeat(num_aug, 1)
+        
+        return batch
 
-    def compute_loss(self, actor:ActorCritic.actor, batch:RolloutStorage.Batch, original_batch_size : int) -> torch.Tensor:
+    def compute_loss(
+        self,
+        actor,
+        batch,
+        original_batch_size,
+        hidden_states
+    ):
+
+        # crea augmented obs LOCALMENTE
         if not self.use_data_augmentation:
-            batch.observations, _ = self.data_augmentation_func(env=self.env, obs=batch.observation, actions=None)
+            augmented_obs, _ = self.data_augmentation_func(
+                env=self.env,
+                obs=batch.observations,
+                actions=None
+            )
+        else:
+            augmented_obs = batch.observations
 
-        mean_actions = actor(batch.observations.detach().clone())
-
-        # Mirror the original-slice action means using the augmentation function. We use the action means here rather
-        # than the sampled actions in ``batch.actions``, since the symmetry loss is defined on the policy mean.
-        _, mean_actions_symm = self.data_augmentation_func(
-            env=self.env, obs=None, actions=mean_actions[:original_batch_size]
+        # symmetry branch STATELESS
+        mean_actions, _ = actor(
+            augmented_obs.detach(),
+            hidden_states=None
         )
 
-        # MSE between the actor prediction on mirrored obs and the mirrored actor prediction on the original obs
+        _, mean_actions_symm = self.data_augmentation_func(
+            env=self.env,
+            obs=None,
+            actions=mean_actions[:original_batch_size]
+        )
+
         symmetry_loss = nn.functional.mse_loss(
             mean_actions[original_batch_size:],
-            mean_actions_symm.detach()[original_batch_size:],
+            mean_actions_symm.detach()[original_batch_size:]
         )
+
         return symmetry_loss if self.use_mirror_loss else symmetry_loss.detach()
 
-def data_augmentation_func(self, env, obs=None, actions=None):
-    return obs, actions
+    def data_augmentation_func(self, env, obs=None, actions=None):
+        swap_joint_indices = [3, 4, 5, 0, 1, 2, 9, 10, 11, 6, 7, 8]
+        negate_joints_indices = [0, 3, 6, 9] 
+
+        aug_obs = None
+        aug_actions = None
+
+        if obs is not None:
+            aug_obs = obs.clone()
+            
+            # --- Proprioception & Commands (Indices 0-11) ---
+            aug_obs[:, 1] *= -1.0   # Base Lin Vel Y
+            aug_obs[:, 3] *= -1.0   # Base Ang Vel Roll (X)
+            aug_obs[:, 5] *= -1.0   # Base Ang Vel Yaw (Z)
+            aug_obs[:, 7] *= -1.0   # Projected Gravity Y
+            aug_obs[:, 10] *= -1.0  # Command Y
+            aug_obs[:, 11] *= -1.0  # Command Yaw
+
+            # --- Joints & Previous Actions (Indices 12-47) ---
+            # 12:24 (DOF Pos), 24:36 (DOF Vel), 36:48 (Prev Actions)
+            for start_idx in [12, 24, 36]:
+                # Slice out the 12 joints, reorder them, and put them back
+                leg_data = obs[:, start_idx : start_idx + 12]
+                mirrored_legs = leg_data[:, swap_joint_indices].clone()
+                
+                # Flip signs of the Hip/Abduction joints
+                mirrored_legs[:, negate_joints_indices] *= -1.0
+                aug_obs[:, start_idx : start_idx + 12] = mirrored_legs
+
+            # --- Height Scans (Indices 48 to end) ---
+            if self.env.cfg.terrain.measure_heights:
+                h_start = 48
+                num_rows = 17 # measured_points_x
+                num_cols = 11 # measured_points_y
+                
+                # Extract only the height portion
+                heights = obs[:, h_start : h_start + (num_rows * num_cols)]
+                
+                # Reshape to 2D grid [Batch, Rows, Cols]
+                heights_grid = heights.view(-1, num_rows, num_cols)
+                
+                # Flip the Y-axis (the columns)
+                # This moves "Left" terrain data to the "Right" side
+                flipped_heights = torch.flip(heights_grid, dims=[2]) 
+                
+                # Flatten back to vector and update augmented observation
+                aug_obs[:, h_start : h_start + (num_rows * num_cols)] = flipped_heights.reshape(obs.shape[0], -1)
+
+        if actions is not None:
+            aug_actions = actions.clone()
+            # Mirror the action output same as the DOF Pos
+            aug_actions = aug_actions[:, swap_joint_indices]
+            aug_actions[:, negate_joints_indices] *= -1.0
+
+        if obs is not None:
+            aug_obs = torch.cat([obs, aug_obs], dim=0)
+
+        if actions is not None:
+            aug_actions = torch.cat([actions, aug_actions], dim=0)
+
+        return aug_obs, aug_actions
+
 
 @dataclass
 class DummyBatch:

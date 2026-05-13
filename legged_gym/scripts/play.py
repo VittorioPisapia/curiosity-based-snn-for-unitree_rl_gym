@@ -38,8 +38,8 @@ def play(args):
     logger = RobotLogger()
     recorder = None
 
-    env_cfg.terrain.num_rows = 5
-    env_cfg.terrain.num_cols = 5
+    env_cfg.terrain.num_rows = 6
+    env_cfg.terrain.num_cols = 6
     env_cfg.terrain.curriculum = False
     env_cfg.noise.add_noise = False
     env_cfg.domain_rand.randomize_friction = False

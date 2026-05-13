@@ -37,7 +37,7 @@ class SnnRunner ( OnPolicyRunner ):
                                                         self.env.num_actions,
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
-        self.alg: PPO_Snn = alg_class(actor_critic, device=self.device, **self.alg_cfg)
+        self.alg: PPO_Snn = alg_class(env=self.env, actor_critic=actor_critic, device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
 
@@ -104,6 +104,7 @@ class SnnRunner ( OnPolicyRunner ):
                 self.alg.compute_returns(critic_obs)
             
             mean_value_loss, mean_surrogate_loss, mean_symmetry_loss = self.alg.update()
+
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:

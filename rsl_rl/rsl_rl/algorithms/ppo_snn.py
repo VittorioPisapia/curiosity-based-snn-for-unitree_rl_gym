@@ -12,6 +12,7 @@ from rsl_rl.modules.symmetry import DummyBatch, Symmetry
 class PPO_Snn (PPO):
     actor_critic: ActorCriticSNN
     def __init__(self,
+                 env,
                  actor_critic,
                  use_symmetry,
                  symmetry,
@@ -35,6 +36,7 @@ class PPO_Snn (PPO):
         self.desired_kl = desired_kl
         self.schedule = schedule
         self.learning_rate = learning_rate
+        self.env = env
 
         # PPO components
         self.actor_critic = actor_critic
@@ -45,7 +47,7 @@ class PPO_Snn (PPO):
 
         # Symmetry
         self.use_symmetry = use_symmetry
-        self.symmetry_module = Symmetry(**symmetry) if use_symmetry else None
+        self.symmetry_module = Symmetry(env=self.env, **symmetry) if use_symmetry else None
 
         # PPO parameters
         self.clip_param = clip_param
@@ -175,7 +177,7 @@ class PPO_Snn (PPO):
 
                 # Symmetry loss
                 if self.symmetry_module:
-                    symmetry_loss = self.symmetry_module.compute_loss(self.actor_critic.actor, batch, original_size)
+                    symmetry_loss = self.symmetry_module.compute_loss(self.actor_critic.actor, batch, original_size, hidden_states=hid_states_batch)
                     if self.symmetry_module.use_mirror_loss:
                         loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
                 # Gradient step
