@@ -55,7 +55,6 @@ class Symmetry:
         hidden_states
     ):
 
-        # crea augmented obs LOCALMENTE
         if not self.use_data_augmentation:
             augmented_obs, _ = self.data_augmentation_func(
                 env=self.env,
@@ -65,7 +64,6 @@ class Symmetry:
         else:
             augmented_obs = batch.observations
 
-        # symmetry branch STATELESS
         mean_actions, _ = actor(
             augmented_obs.detach(),
             hidden_states=None

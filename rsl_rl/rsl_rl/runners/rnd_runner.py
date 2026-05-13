@@ -27,6 +27,9 @@ class RndRunner ( SnnRunner ):
         self.use_rnd = self.alg_cfg["use_rnd"]
         self.rnd_cfg = self.alg_cfg["rnd"]
 
+        self.use_symmetry = self.alg_cfg["use_symmetry"]
+        self.symmetry_cfg = self.alg_cfg["symmetry"]
+
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
         else:
@@ -37,7 +40,7 @@ class RndRunner ( SnnRunner ):
                                                         self.env.num_actions,
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
-        self.alg: PPO_Rnd = alg_class(actor_critic, device=self.device, **self.alg_cfg)
+        self.alg: PPO_Rnd = alg_class(env=self.env, actor_critic=actor_critic, device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
 
@@ -138,7 +141,7 @@ class RndRunner ( SnnRunner ):
                 start = stop
                 self.alg.compute_returns(critic_obs)
             
-            mean_value_loss, mean_surrogate_loss, mean_rnd_loss = self.alg.update()
+            mean_value_loss, mean_surrogate_loss, mean_rnd_loss, mean_symmetry_loss = self.alg.update()
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:
@@ -183,6 +186,8 @@ class RndRunner ( SnnRunner ):
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
         if locs.get('mean_rnd_loss') is not None:
             self.writer.add_scalar('Loss/rnd_loss', locs['mean_rnd_loss'], locs['it'])
+        if locs.get('mean_symmetry_loss') is not None:
+            self.writer.add_scalar('Loss/symmetry_loss', locs['mean_symmetry_loss'], locs['it'])
         self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
 

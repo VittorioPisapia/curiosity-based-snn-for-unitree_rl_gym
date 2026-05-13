@@ -22,7 +22,7 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
         class symmetry:
             
             use_data_augmentation = False
-            use_mirror_loss = True
+            use_mirror_loss = False
             mirror_loss_coeff = 0.5
 
 

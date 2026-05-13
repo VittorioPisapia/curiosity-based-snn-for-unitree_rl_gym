@@ -180,6 +180,7 @@ class PPO_Snn (PPO):
                     symmetry_loss = self.symmetry_module.compute_loss(self.actor_critic.actor, batch, original_size, hidden_states=hid_states_batch)
                     if self.symmetry_module.use_mirror_loss:
                         loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
+                
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
