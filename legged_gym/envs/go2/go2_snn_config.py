@@ -16,4 +16,14 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
         experiment_name = "rough_go2_snn"
         algorithm_class_name = 'PPO_Snn'
 
+    class algorithm ( GO2RoughCfgPPO.algorithm):
+        use_symmetry = True
+
+        class symmetry:
+            
+            use_data_augmentation = False
+            use_mirror_loss = False
+            mirror_loss_coeff = 0.5
+
+
         

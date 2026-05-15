@@ -18,3 +18,11 @@ class GO2RoughRNDCfgPPO( GO2RoughSNNCfgPPO):
             target_hidden_dims = [32]
             learning_rate = 1.e-4
             weight = 0.0001
+
+        use_symmetry = True
+
+        class symmetry:
+            
+            use_data_augmentation = False
+            use_mirror_loss = True
+            mirror_loss_coeff = 0.2

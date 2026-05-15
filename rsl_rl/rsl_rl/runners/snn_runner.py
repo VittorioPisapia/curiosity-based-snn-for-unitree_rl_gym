@@ -23,6 +23,10 @@ class SnnRunner ( OnPolicyRunner ):
         self.policy_cfg = train_cfg["policy"]
         self.device = device
         self.env = env
+
+        self.use_symmetry = self.alg_cfg["use_symmetry"]
+        self.symmetry_cfg = self.alg_cfg["symmetry"]
+
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
         else:
@@ -33,7 +37,7 @@ class SnnRunner ( OnPolicyRunner ):
                                                         self.env.num_actions,
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
-        self.alg: PPO_Snn = alg_class(actor_critic, device=self.device, **self.alg_cfg)
+        self.alg: PPO_Snn = alg_class(env=self.env, actor_critic=actor_critic, device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
 
@@ -99,7 +103,8 @@ class SnnRunner ( OnPolicyRunner ):
                 start = stop
                 self.alg.compute_returns(critic_obs)
             
-            mean_value_loss, mean_surrogate_loss = self.alg.update()
+            mean_value_loss, mean_surrogate_loss, mean_symmetry_loss = self.alg.update()
+
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:
@@ -143,6 +148,8 @@ class SnnRunner ( OnPolicyRunner ):
         self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
         self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
+        if locs.get('mean_symmetry_loss') is not None:
+            self.writer.add_scalar('Loss/symmetry_loss', locs['mean_symmetry_loss'], locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
 
         self.writer.add_scalar('SNN/s1_spike_rate', self.alg.actor_critic.actor.last_s1_rate, locs['it'])
