@@ -45,7 +45,7 @@ class PPO_Rnd (PPO):
         self.rnd = RandomNetworkDistillation(device=self.device, **rnd) if self.use_rnd else None
 
         # Normalizer
-        self.state_normalizer = EmpiricalNormalization(shape=rnd["num_obs"]).to(self.device)
+        # self.state_normalizer = EmpiricalNormalization(shape=rnd["num_obs"]).to(self.device)
         #reward_normalizer = EmpiricalDiscountedVariationNormalization(shape=(1,), gamma=0.99)
 
         # Symmetry
@@ -203,9 +203,9 @@ class PPO_Rnd (PPO):
 
                     obs_batch_for_rnd = torch.cat((obs_lin_vel,obs_dof_pos,obs_dof_vel), dim=-1)    #+187 add it for height measurements
                     
-                    normalized_obs_batch = self.state_normalizer(obs_batch_for_rnd)
+                    #normalized_obs_batch = self.state_normalizer(obs_batch_for_rnd)
                     
-                    rnd_loss = self.rnd.compute_loss(normalized_obs_batch)
+                    rnd_loss = self.rnd.compute_loss(obs_batch_for_rnd)
                 else:
                     rnd_loss = None
 

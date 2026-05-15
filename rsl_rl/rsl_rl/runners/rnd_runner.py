@@ -47,7 +47,7 @@ class RndRunner ( SnnRunner ):
         # init storage and model
         self.alg.init_storage(self.env.num_envs, self.num_steps_per_env, [self.env.num_obs], [self.env.num_privileged_obs], [self.env.num_actions])
 
-        self.normalizer = self.alg.state_normalizer
+        #self.normalizer = self.alg.state_normalizer
 
         # Log
         self.log_dir = log_dir
@@ -102,8 +102,8 @@ class RndRunner ( SnnRunner ):
 
                     obs_for_rnd = torch.cat((obs_lin_vel,obs_dof_pos,obs_dof_vel), dim=-1)
                     #obs_for_rnd = torch.cat((obs[:, :9], obs[:, 12:-(12)]), dim=-1)  # No actions, no commands, no heights (add +187)
-                    normalized_state = self.normalizer(obs_for_rnd)
-                    intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(normalized_state) if self.use_rnd else None
+                    #normalized_state = self.normalizer(obs_for_rnd)
+                    intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(obs_for_rnd) if self.use_rnd else None
 
                     mean_extrinsic_reward += rewards.mean().item()
                     
