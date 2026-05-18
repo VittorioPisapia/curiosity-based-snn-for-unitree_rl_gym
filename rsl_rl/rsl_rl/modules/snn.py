@@ -188,6 +188,7 @@ class SNN(nn.Module):
         self.last_spike_rates = [0.0 for _ in range(self.num_layers)]
         self.last_membrane_means = [0.0 for _ in range(self.num_layers)]
         self.last_membrane_stds = [0.0 for _ in range(self.num_layers)]
+        self.last_layer_spikes = [None for _ in range(self.num_layers)]
         
         self.last_decay_mean = 0.0
         self.last_decay_std = 0.0
@@ -291,6 +292,8 @@ class SNN(nn.Module):
 
             self.last_threshold_mean = thresholds.mean().item()
             self.last_threshold_std = thresholds.std().item()
+
+        self.last_layer_spikes = new_spikes
 
         out = self.output_layer(new_mems[-1])    
 

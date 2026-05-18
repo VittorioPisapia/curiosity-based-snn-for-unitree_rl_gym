@@ -18,6 +18,9 @@ class PPO_Rnd (PPO):
                  rnd ,
                  use_symmetry,
                  symmetry,
+                 use_spike_loss,
+                 spike_loss_coeff,
+                 spike_rate_target,
                  num_learning_epochs=1,
                  num_mini_batches=1,
                  clip_param=0.2,
@@ -51,6 +54,10 @@ class PPO_Rnd (PPO):
         # Symmetry
         self.use_symmetry = use_symmetry
         self.symmetry_module = Symmetry(env=self.env, **symmetry) if use_symmetry else None
+
+        self.use_spike_loss = use_spike_loss
+        self.target_rates = spike_rate_target
+        self.spike_loss_coeff = spike_loss_coeff
 
         # PPO components
         self.actor_critic = actor_critic
@@ -107,6 +114,8 @@ class PPO_Rnd (PPO):
 
         mean_value_loss = 0
         mean_surrogate_loss = 0
+
+        mean_spike_loss = 0 if self.use_spike_loss else None
 
         mean_rnd_loss = 0 if self.use_rnd else None
 
@@ -209,6 +218,19 @@ class PPO_Rnd (PPO):
                 else:
                     rnd_loss = None
 
+                if self.use_spike_loss:
+                    spike_rates = self.actor_critic.actor.last_layer_spikes
+
+                    spike_loss = 0.0
+
+                    for l, s in enumerate(spike_rates):
+                        rate = s.mean()
+                        spike_loss += (rate - self.target_rates[l]) ** 2
+
+                    spike_loss /= len(spike_rates)
+                    
+                    loss = loss + spike_loss * self.spike_loss_coeff
+
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -225,6 +247,8 @@ class PPO_Rnd (PPO):
 
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()
+                if mean_spike_loss is not None:
+                    mean_spike_loss += spike_loss.item()
                 if mean_rnd_loss is not None:
                     mean_rnd_loss += rnd_loss.item()
                 if mean_symmetry_loss is not None:
@@ -235,6 +259,8 @@ class PPO_Rnd (PPO):
 
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates
+        if mean_spike_loss is not None:
+            mean_spike_loss /= num_updates
         if mean_rnd_loss is not None:
             mean_rnd_loss /= num_updates
         if mean_symmetry_loss is not None:
@@ -242,4 +268,4 @@ class PPO_Rnd (PPO):
 
         self.storage.clear()
 
-        return mean_value_loss, mean_surrogate_loss, mean_rnd_loss, mean_symmetry_loss
+        return mean_value_loss, mean_surrogate_loss, mean_rnd_loss, mean_symmetry_loss, mean_spike_loss

@@ -141,7 +141,7 @@ class RndRunner ( SnnRunner ):
                 start = stop
                 self.alg.compute_returns(critic_obs)
             
-            mean_value_loss, mean_surrogate_loss, mean_rnd_loss, mean_symmetry_loss = self.alg.update()
+            mean_value_loss, mean_surrogate_loss, mean_rnd_loss, mean_symmetry_loss, mean_spike_loss = self.alg.update()
             stop = time.time()
             learn_time = stop - start
             if self.log_dir is not None:
@@ -196,6 +196,8 @@ class RndRunner ( SnnRunner ):
 
         self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
+        if locs.get('mean_spike_loss') is not None:
+            self.writer.add_scalar('Loss/spike_loss', locs['mean_spike_loss'], locs['it'])
         if locs.get('mean_rnd_loss') is not None:
             self.writer.add_scalar('Loss/rnd_loss', locs['mean_rnd_loss'], locs['it'])
         if locs.get('mean_symmetry_loss') is not None:

@@ -19,6 +19,10 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
     class algorithm ( GO2RoughCfgPPO.algorithm):
         use_symmetry = True
 
+        use_spike_loss = True
+        spike_loss_coeff = 0.01
+        spike_rate_target = [0.25, 0.10]
+
         class symmetry:
             
             use_data_augmentation = False

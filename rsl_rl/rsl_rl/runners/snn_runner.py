@@ -24,8 +24,12 @@ class SnnRunner ( OnPolicyRunner ):
         self.device = device
         self.env = env
 
-        self.use_symmetry = self.alg_cfg["use_symmetry"]
-        self.symmetry_cfg = self.alg_cfg["symmetry"]
+        #self.use_symmetry = self.alg_cfg["use_symmetry"]
+        #self.symmetry_cfg = self.alg_cfg["symmetry"]
+#
+        #self.use_spike_loss = self.alg_cfg["use_spike_loss"]
+        #self.spike_loss_coeff = self.alg_cfg["spike_loss_coeff"]
+        #self.spike_rate_target = self.alg_cfg["spike_rate_target"]
 
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
@@ -103,7 +107,7 @@ class SnnRunner ( OnPolicyRunner ):
                 start = stop
                 self.alg.compute_returns(critic_obs)
             
-            mean_value_loss, mean_surrogate_loss, mean_symmetry_loss = self.alg.update()
+            mean_value_loss, mean_surrogate_loss, mean_symmetry_loss, mean_spike_loss = self.alg.update()
 
             stop = time.time()
             learn_time = stop - start
@@ -159,6 +163,8 @@ class SnnRunner ( OnPolicyRunner ):
 
         self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
+        if locs.get('mean_spike_loss') is not None:
+            self.writer.add_scalar('Loss/spike_loss', locs['mean_spike_loss'], locs['it'])
         self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
         if locs.get('mean_symmetry_loss') is not None:
             self.writer.add_scalar('Loss/symmetry_loss', locs['mean_symmetry_loss'], locs['it'])

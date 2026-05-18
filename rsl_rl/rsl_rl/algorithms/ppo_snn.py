@@ -16,6 +16,9 @@ class PPO_Snn (PPO):
                  actor_critic,
                  use_symmetry,
                  symmetry,
+                 use_spike_loss,
+                 spike_loss_coeff,
+                 spike_rate_target,
                  num_learning_epochs=1,
                  num_mini_batches=1,
                  clip_param=0.2,
@@ -37,6 +40,10 @@ class PPO_Snn (PPO):
         self.schedule = schedule
         self.learning_rate = learning_rate
         self.env = env
+
+        self.use_spike_loss = use_spike_loss
+        self.target_rates = spike_rate_target
+        self.spike_loss_coeff = spike_loss_coeff
 
         # PPO components
         self.actor_critic = actor_critic
@@ -97,6 +104,8 @@ class PPO_Snn (PPO):
 
         mean_value_loss = 0
         mean_surrogate_loss = 0
+
+        mean_spike_loss = 0 if self.use_spike_loss else None
 
         mean_symmetry_loss = 0 if self.use_symmetry else None
 
@@ -173,7 +182,7 @@ class PPO_Snn (PPO):
                 else:
                     value_loss = (batch.returns - value_batch).pow(2).mean()
 
-                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch_orig.mean()
+                loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch_orig.mean() 
 
                 # Symmetry loss
                 if self.symmetry_module:
@@ -181,6 +190,19 @@ class PPO_Snn (PPO):
                     if self.symmetry_module.use_mirror_loss:
                         loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
                 
+                if self.use_spike_loss:
+                    spike_rates = self.actor_critic.actor.last_layer_spikes
+
+                    spike_loss = 0.0
+
+                    for l, s in enumerate(spike_rates):
+                        rate = s.mean()
+                        spike_loss += (rate - self.target_rates[l]) ** 2
+
+                    spike_loss /= len(spike_rates)
+                    
+                    loss = loss + spike_loss * self.spike_loss_coeff
+
                 # Gradient step
                 self.optimizer.zero_grad()
                 loss.backward()
@@ -191,17 +213,20 @@ class PPO_Snn (PPO):
 
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()
+                if mean_spike_loss is not None:
+                    mean_spike_loss += spike_loss.item()
                 if mean_symmetry_loss is not None:
                     mean_symmetry_loss += symmetry_loss.item()
 
         num_updates = self.num_learning_epochs * self.num_mini_batches
 
-
         mean_value_loss /= num_updates
         mean_surrogate_loss /= num_updates
+        if mean_spike_loss is not None:
+            mean_spike_loss /= num_updates
         if mean_symmetry_loss is not None:
             mean_symmetry_loss /= num_updates
 
         self.storage.clear()
 
-        return mean_value_loss, mean_surrogate_loss, mean_symmetry_loss
+        return mean_value_loss, mean_surrogate_loss, mean_symmetry_loss, mean_spike_loss
