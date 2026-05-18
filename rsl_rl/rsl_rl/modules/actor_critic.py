@@ -160,7 +160,7 @@ class ActorCriticSNN(nn.Module):
         snn_neuron_type = snn_cfg.get('neuron_type', 'Gaussian')
         threshold_init = snn_cfg.get('snn_threshold', 0.5)
         lens = snn_cfg.get('snn_lens', 0.3)
-        num_neurons = snn_cfg.get('num_neurons', 256)
+        num_neurons = snn_cfg.get('num_neurons', [384,256])
         st = kwargs.get('snn_st', 1)
 
         self.actor = SNN(mlp_input_dim_a, num_neurons, num_actions, device="cuda", threshold_init=threshold_init, lens=lens, neuron_type=snn_neuron_type)

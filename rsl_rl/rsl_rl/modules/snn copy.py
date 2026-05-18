@@ -142,30 +142,18 @@ class LIF_BPTT(Neurons):
 
 
 class SNN(nn.Module):
-    def __init__(self, input_dim, num_neurons, output_dim, device, threshold_init=0.5, lens=0.3, neuron_type="Gaussian"):
+    def __init__(self, input_dim, hidden_dim, output_dim, device, threshold_init=0.5, lens=0.3, neuron_type="Gaussian"):
         super().__init__()
         
         self.device = torch.device(device) if isinstance(device, str) else device
-        self.num_neurons = num_neurons
-        self.num_layers = len(num_neurons)
-        self.total_neurons = sum(num_neurons)
-
-        self.spike_dim = self.total_neurons
-        self.mem_dim = self.total_neurons
+        self.hidden_dim = hidden_dim
 
         self.input_norm = nn.LayerNorm(input_dim)
 
-        # ---- Linear layers ----
-        layer_dims = [input_dim] + num_neurons
+        self.fc1 = nn.Linear(input_dim, hidden_dim)
+        self.fc2 = nn.Linear(hidden_dim, hidden_dim)
+        self.fc3 = nn.Linear(hidden_dim, output_dim)
 
-        self.layers = nn.ModuleList([
-            nn.Linear(layer_dims[i], layer_dims[i +1])
-            for i in range(self.num_layers)
-        ])
-
-        self.output_layer = nn.Linear(num_neurons[-1], output_dim)
-
-        # ---- Neuron model ----
         if neuron_type == "Gaussian":
             self.fs = LIFGaussian(lens=lens, device=self.device)
         elif neuron_type == "BPTT":
@@ -173,27 +161,21 @@ class SNN(nn.Module):
         else:
             raise ValueError(f"Unsupported neuron type: {neuron_type}")
 
-        # ---- State dimensions ----
-        self.total_neurons = sum(num_neurons)
+        self.spike_dim = 2 * hidden_dim
+        self.mem_dim = 2 * hidden_dim
 
-        # ---- Decyas and thresholds ----
         self.thresholds_raw = nn.Parameter(
-            torch.full((self.total_neurons,), threshold_init, device=self.device) 
+            torch.full((self.spike_dim,), threshold_init, device=self.device) 
         )
         self.decays_raw = nn.Parameter(
-            torch.full((self.total_neurons,), -0.5, device=self.device) #-0.5
+            torch.full((self.mem_dim,), -0.5, device=self.device) #-0.5
         )
 
-        # ---- Logging ----
-        self.last_spike_rates = [0.0 for _ in range(self.num_layers)]
-        self.last_membrane_means = [0.0 for _ in range(self.num_layers)]
-        self.last_membrane_stds = [0.0 for _ in range(self.num_layers)]
-        
+        self.last_s1_rate = 0.0
+        self.last_s2_rate = 0.0
+        self.last_m1_mean = 0.0
+        self.last_m2_mean = 0.0
         self.last_decay_mean = 0.0
-        self.last_decay_std = 0.0
-
-        self.last_threshold_mean = 0.0
-        self.last_threshold_std = 0.0
 
     def _neurons_forward(self, x, hidden_states, start_idx, end_idx, output_spikes=True):
         local_states = {}
@@ -219,7 +201,6 @@ class SNN(nn.Module):
         )
 
     def forward(self, obs, hidden_states, st=1):
-
         obs = obs.to(self.device)
         obs = self.input_norm(obs)
 
@@ -228,8 +209,8 @@ class SNN(nn.Module):
 
         if hidden_states is None:
             current_state = {
-                "snn_m": torch.zeros(batch_size, self.total_neurons, device=self.device),
-                "snn_s": torch.zeros(batch_size, self.total_neurons, device=self.device),
+                "snn_m": torch.zeros(batch_size, self.mem_dim, device=self.device),
+                "snn_s": torch.zeros(batch_size, self.spike_dim, device=self.device),
             }
         else:
             current_state = {
@@ -238,60 +219,23 @@ class SNN(nn.Module):
             }
 
         for _ in range(st):
+            z1 = self.fc1(obs) 
+            h1 = self._neurons_forward(z1, current_state, 0, self.hidden_dim, True)
 
-            x = obs
-            new_mems = []
-            new_spikes = []
-            start_idx = 0
+            z2 = self.fc2(h1["snn_s"])
+            h2 = self._neurons_forward(z2, current_state, self.hidden_dim, 2 * self.hidden_dim, True)
 
-            for layer_idx, layer in enumerate(self.layers):
-                end_idx = start_idx + self.num_neurons[layer_idx]
-
-                z = layer(x)
-
-                h = self._neurons_forward(
-                    z,
-                    current_state,
-                    start_idx,
-                    end_idx,
-                    True
-                )
-
-                x = h["snn_s"]
-
-                new_mems.append(h["snn_m"])
-                new_spikes.append(h["snn_s"])
-
-                self.last_spike_rates[layer_idx] = (
-                    h["snn_s"].mean().item()
-                )
-
-                self.last_membrane_means[layer_idx] = (
-                    h["snn_m"].mean().item()
-                )
-
-                self.last_membrane_stds[layer_idx] = (
-                    h["snn_m"].std().item()
-                )
-
-                start_idx = end_idx
-            
             current_state = {
-                "snn_m" : torch.cat(new_mems, dim=1),
-                "snn_s" : torch.cat(new_spikes,dim=1)
+                "snn_m": torch.cat([h1["snn_m"], h2["snn_m"]], dim=1),
+                "snn_s": torch.cat([h1["snn_s"], h2["snn_s"]], dim=1),
             }
 
-            decays = torch.sigmoid(self.decays_raw)
-            thresholds = (
-                torch.relu(self.thresholds_raw) + 0.1
-            )
+            self.last_s1_rate = h1["snn_s"].mean().item()
+            self.last_s2_rate = h2["snn_s"].mean().item()
+            self.last_m1_mean = h1["snn_m"].mean().item()
+            self.last_m2_mean = h2["snn_m"].mean().item()
+            self.last_decay_mean = torch.sigmoid(self.decays_raw).mean().item()
+            self.last_threshold_mean = (torch.relu(self.thresholds_raw) + 0.1).mean().item()
 
-            self.last_decay_mean = decays.mean().item()
-            self.last_decay_std = decays.std().item()
-
-            self.last_threshold_mean = thresholds.mean().item()
-            self.last_threshold_std = thresholds.std().item()
-
-        out = self.output_layer(new_mems[-1])    
-
+        out = self.fc3(h2["snn_m"])
         return out, current_state

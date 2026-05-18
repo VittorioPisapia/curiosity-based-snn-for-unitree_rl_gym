@@ -138,12 +138,24 @@ class SnnRunner ( OnPolicyRunner ):
         mean_std = self.alg.actor_critic.std.mean()
         fps = int(self.num_steps_per_env * self.env.num_envs / (locs['collection_time'] + locs['learn_time']))
         actor = self.alg.actor_critic.actor
-        s1_rate = getattr(actor, "last_s1_rate", float("nan"))
-        s2_rate = getattr(actor, "last_s2_rate", float("nan"))
-        m1_mean = getattr(actor, "last_m1_mean", float("nan"))
-        m2_mean = getattr(actor, "last_m2_mean", float("nan"))
+
+        spike_rates = getattr(actor, "last_spike_rates", [])
+        membrane_means = getattr(actor, "last_membrane_means", [])
+        self.writer.add_scalar(
+            'SNN/decay_std',
+            actor.last_decay_std,
+            locs['it']
+        )
+
+        self.writer.add_scalar(
+            'SNN/threshold_std',
+            actor.last_threshold_std,
+            locs['it']
+        )
+        
         decay_mean = getattr(actor, "last_decay_mean", float("nan"))
         threshold_mean = getattr(actor, "last_threshold_mean", float("nan"))
+        membrane_stds = getattr(actor, "last_membrane_stds", [])
 
         self.writer.add_scalar('Loss/value_function', locs['mean_value_loss'], locs['it'])
         self.writer.add_scalar('Loss/surrogate', locs['mean_surrogate_loss'], locs['it'])
@@ -152,10 +164,27 @@ class SnnRunner ( OnPolicyRunner ):
             self.writer.add_scalar('Loss/symmetry_loss', locs['mean_symmetry_loss'], locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
 
-        self.writer.add_scalar('SNN/s1_spike_rate', self.alg.actor_critic.actor.last_s1_rate, locs['it'])
-        self.writer.add_scalar('SNN/s2_spike_rate', self.alg.actor_critic.actor.last_s2_rate, locs['it'])
-        self.writer.add_scalar('SNN/m1_mean', self.alg.actor_critic.actor.last_m1_mean, locs['it'])
-        self.writer.add_scalar('SNN/m2_mean', self.alg.actor_critic.actor.last_m2_mean, locs['it'])
+        for layer_idx, rate in enumerate(spike_rates):
+            self.writer.add_scalar(
+                f'SNN/layer_{layer_idx}_spike_rate',
+                rate,
+                locs['it']
+            )
+
+        for layer_idx, mem in enumerate(membrane_means):
+            self.writer.add_scalar(
+                f'SNN/layer_{layer_idx}_membrane_mean',
+                mem,
+                locs['it']
+            )
+
+        for layer_idx, mem_std in enumerate(membrane_stds):
+            self.writer.add_scalar(
+                f'SNN/layer_{layer_idx}_membrane_std',
+                mem_std,
+                locs['it']
+            )
+            
         self.writer.add_scalar('SNN/decay_mean', self.alg.actor_critic.actor.last_decay_mean, locs['it'])
         self.writer.add_scalar('SNN/threshold_mean', self.alg.actor_critic.actor.last_threshold_mean, locs['it'])
         if len(locs['rewbuffer']) > 0:
@@ -165,7 +194,40 @@ class SnnRunner ( OnPolicyRunner ):
             self.writer.add_scalar('Train/mean_episode_length/time', statistics.mean(locs['lenbuffer']), self.tot_time)
 
         str = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
+        snn_string = ""
 
+        for layer_idx, rate in enumerate(spike_rates):
+            snn_string += (
+                f"{f'SNN layer {layer_idx} spike rate:':>{pad}} "
+                f"{rate:.4f}\n"
+            )
+
+        for layer_idx, mem in enumerate(membrane_means):
+            snn_string += (
+                f"{f'SNN layer {layer_idx} mem mean:':>{pad}} "
+                f"{mem:.4f}\n"
+            )
+
+        snn_string += (
+            f"{f'SNN decay mean:':>{pad}} "
+            f"{decay_mean:.4f}\n"
+        )
+
+        snn_string += (
+            f"{f'SNN decay std:':>{pad}} "
+            f"{actor.last_decay_std:.4f}\n"
+        )
+
+        snn_string += (
+            f"{f'SNN threshold mean:':>{pad}} "
+            f"{threshold_mean:.4f}\n"
+        )
+
+        snn_string += (
+            f"{f'SNN threshold std:':>{pad}} "
+            f"{actor.last_threshold_std:.4f}\n"
+        )
+        
         if len(locs['rewbuffer']) > 0:
             log_string = (f"""{'#' * width}\n"""
               f"""{str.center(width, ' ')}\n\n"""
@@ -173,12 +235,7 @@ class SnnRunner ( OnPolicyRunner ):
               f"""{'Value function loss:':>{pad}} {locs['mean_value_loss']:.4f}\n"""
               f"""{'Surrogate loss:':>{pad}} {locs['mean_surrogate_loss']:.4f}\n"""
               f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
-              f"""{'SNN s1 spike rate:':>{pad}} {s1_rate:.4f}\n"""
-              f"""{'SNN s2 spike rate:':>{pad}} {s2_rate:.4f}\n"""
-              f"""{'SNN m1 mean:':>{pad}} {m1_mean:.4f}\n"""
-              f"""{'SNN m2 mean:':>{pad}} {m2_mean:.4f}\n"""
-              f"""{'SNN decay mean:':>{pad}} {decay_mean:.4f}\n"""
-              f"""{'SNN threshold mean:':>{pad}} {threshold_mean:.4f}\n"""
+              f"""{snn_string}\n"""
               f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
               f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n""")
         else:

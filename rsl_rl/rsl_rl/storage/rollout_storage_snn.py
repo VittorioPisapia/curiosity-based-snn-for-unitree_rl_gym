@@ -34,49 +34,66 @@ class RolloutStorage_Snn ( RolloutStorage ):
 
     def mini_batch_generator(self, num_mini_batches, num_epochs=8):
 
-        batch_size = self.num_envs * self.num_transitions_per_env
-        mini_batch_size = batch_size // num_mini_batches
-        indices = torch.randperm(num_mini_batches*mini_batch_size, requires_grad=False, device=self.device)
+        T = self.num_transitions_per_env
+        N = self.num_envs
 
-        observations = self.observations.flatten(0, 1)
+        # chunk temporale (TBPTT window)
+        seq_len = T // num_mini_batches
+
+        observations = self.observations  # [T, N, obs]
         if self.privileged_observations is not None:
-            critic_observations = self.privileged_observations.flatten(0, 1)
+            critic_observations = self.privileged_observations
         else:
             critic_observations = observations
 
-        actions = self.actions.flatten(0, 1)
-        values = self.values.flatten(0, 1)
-        returns = self.returns.flatten(0, 1)
-        old_actions_log_prob = self.actions_log_prob.flatten(0, 1)
-        advantages = self.advantages.flatten(0, 1)
-        old_mu = self.mu.flatten(0, 1)
-        old_sigma = self.sigma.flatten(0, 1)
-        snn_m = self.snn_m.flatten(0,1)
-        snn_s = self.snn_s.flatten(0,1)
+        actions = self.actions
+        values = self.values
+        returns = self.returns
+        old_actions_log_prob = self.actions_log_prob
+        advantages = self.advantages
+        old_mu = self.mu
+        old_sigma = self.sigma
 
+        snn_m = self.snn_m
+        snn_s = self.snn_s
 
         for epoch in range(num_epochs):
+
             for i in range(num_mini_batches):
 
-                start = i*mini_batch_size
-                end = (i+1)*mini_batch_size
-                batch_idx = indices[start:end]
+                start = i * seq_len
+                end = (i + 1) * seq_len
 
-                obs_batch = observations[batch_idx]
-                critic_observations_batch = critic_observations[batch_idx]
-                actions_batch = actions[batch_idx]
-                target_values_batch = values[batch_idx]
-                returns_batch = returns[batch_idx]
-                old_actions_log_prob_batch = old_actions_log_prob[batch_idx]
-                advantages_batch = advantages[batch_idx]
-                old_mu_batch = old_mu[batch_idx]
-                old_sigma_batch = old_sigma[batch_idx]
-                snn_m_batch = snn_m[batch_idx]
-                snn_s_batch = snn_s[batch_idx]
+                obs_batch = observations[start:end].reshape(-1, observations.shape[-1])
+                critic_obs_batch = critic_observations[start:end].reshape(-1, critic_observations.shape[-1])
+
+                actions_batch = actions[start:end].reshape(-1, actions.shape[-1])
+                target_values_batch = values[start:end].reshape(-1, 1)
+                returns_batch = returns[start:end].reshape(-1, 1)
+                old_actions_log_prob_batch = old_actions_log_prob[start:end].reshape(-1, 1)
+                advantages_batch = advantages[start:end].reshape(-1, 1)
+                old_mu_batch = old_mu[start:end].reshape(-1, old_mu.shape[-1])
+                old_sigma_batch = old_sigma[start:end].reshape(-1, old_sigma.shape[-1])
+
+
+                snn_m_batch = snn_m[start:end].reshape(-1, snn_m.shape[-1])
+                snn_s_batch = snn_s[start:end].reshape(-1, snn_s.shape[-1])
+
                 hidden_states_batch = {
                     "snn_m": snn_m_batch,
                     "snn_s": snn_s_batch
                 }
 
-                yield obs_batch, critic_observations_batch, actions_batch, target_values_batch, advantages_batch, returns_batch, \
-                    old_actions_log_prob_batch, old_mu_batch, old_sigma_batch, hidden_states_batch, None
+                yield (
+                    obs_batch,
+                    critic_obs_batch,
+                    actions_batch,
+                    target_values_batch,
+                    advantages_batch,
+                    returns_batch,
+                    old_actions_log_prob_batch,
+                    old_mu_batch,
+                    old_sigma_batch,
+                    hidden_states_batch,
+                    None
+                )
