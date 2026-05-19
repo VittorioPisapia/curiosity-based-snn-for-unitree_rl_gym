@@ -126,10 +126,6 @@ class TaskRegistry():
         elif runner_class_name == 'SnnRunner':
             from rsl_rl.runners.snn_runner import SnnRunner 
             runner = SnnRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
-            
-        elif runner_class_name == 'IcmRunner': 
-            from rsl_rl.runners.icm_runner import IcmRunner 
-            runner = IcmRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
 
         elif runner_class_name == 'RndRunner': 
             from rsl_rl.runners.rnd_runner import RndRunner 

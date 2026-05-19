@@ -24,21 +24,6 @@ def set_nested_attr(obj, attr, value):
 
 search_space = {
 
-    # "policy.snn.snn_lens": [],
-    # "policy.snn.snn_threshold": [],
-    # "policy.snn.snn_st": [],
-    # "policy.snn.neuron_type": [],
-    # "policy.snn.num_neurons": [],
-    
-    # "policy.icm.use_icm": [],
-    # "policy.icm.icm_beta": [],
-    # "policy.icm.icm_reward_clamp": [],
-    # "policy.icm.icm_epochs": [],
-    # "policy.icm.num_mini_batches": [],
-
-    # "policy.icm.use_rnd": [],
-    # "policy.icm.rnd_intrinsic_coeff": [],
-    # "policy.icm.rnd_reward_clamp": []
 
 }
 
