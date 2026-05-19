@@ -46,7 +46,7 @@ class RolloutStorage:
             self.action_mean = None
             self.action_sigma = None
             self.hidden_states = None
-        
+                    
         def clear(self):
             self.__init__()
 
