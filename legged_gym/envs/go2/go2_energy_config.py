@@ -19,7 +19,7 @@ class GO2RoughEnergyCfgPPO( GO2RoughCfgPPO):
     class algorithm ( GO2RoughCfgPPO.algorithm):
         use_symmetry = True
 
-        use_spike_loss = True
+        use_spike_loss = False
         spike_loss_coeff = 0.01
         spike_rate_target = [0.25, 0.10]
 
@@ -30,7 +30,7 @@ class GO2RoughEnergyCfgPPO( GO2RoughCfgPPO):
             mirror_loss_coeff = 0.5
 
         class energy:
-            forward_loss_coeff = 0.1
+            forward_loss_coeff = 0.5
             energy_loss_coeff = 0.1
 
 

@@ -76,65 +76,15 @@ class SnnRunner_energy ( OnPolicyRunner ):
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
-        lookahead_warmup_iters = self.cfg.get("lookahead_warmup_iters", 250)
-        lookahead_ramp_iters = self.cfg.get("lookahead_ramp_iters", 100) # Quante iterazioni dura il ramp-up (es. da 250 a 350)
-        max_alpha = self.cfg.get("lookahead_max_alpha", 0.2)             # Peso massimo finale del lookahead (20%)
-        noise_scale = self.cfg.get("lookahead_noise_scale", 0.2)         # Restringe il raggio di esplorazione attorno alla policy
-        lambda_reg = self.cfg.get("lookahead_lambda_reg", 0.5)           # Penalizza azioni troppo distanti dalla policy nominale
-        num_candidates = self.cfg.get("lookahead_num_candidates", 5)
-
         tot_iter = self.current_learning_iteration + num_learning_iterations
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
-            
-            if it < lookahead_warmup_iters:
-                alpha = 0.0
-            elif it < (lookahead_warmup_iters + lookahead_ramp_iters):
-                alpha = max_alpha * (it - lookahead_warmup_iters) / lookahead_ramp_iters
-            else:
-                alpha = max_alpha
-
             # Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(obs, critic_obs)
-
-                    if alpha > 0.0:
-                        num_envs = self.env.num_envs
-                        num_actions = self.env.num_actions
-
-                        nominal_actions = actions.clone()
-
-                        actions_expanded = nominal_actions.unsqueeze(1).repeat(1, num_candidates, 1)
-                        action_std = self.alg.actor_critic.std
-                        noise = torch.randn_like(actions_expanded) * action_std.unsqueeze(0).unsqueeze(0) * noise_scale
-                        candidate_actions = torch.clamp(actions_expanded + noise, -1.0, 1.0)
-
-                        flat_candidates = candidate_actions.view(-1, num_actions)
-                        z = self.alg.energy_model.encode(obs)
-                        z_flat = z.unsqueeze(1).repeat(1, num_candidates, 1).view(-1, z.shape[-1])
-
-                        x = torch.cat([z_flat, flat_candidates], dim=-1)
-                        z_next_pred = self.alg.energy_model.forward_model(x)
-                        energy_pred = self.alg.energy_model.energy_head(z_next_pred).view(num_envs, num_candidates)
-
-                        deviation = torch.norm(candidate_actions - nominal_actions.unsqueeze(1), dim=-1)
-                        combined_score = energy_pred + lambda_reg * deviation
-
-                        best_indices = torch.argmin(combined_score, dim=1)
-                        best_actions = candidate_actions[torch.arange(num_envs, device=self.device), best_indices]
-
-                        actions = (1.0 - alpha) * nominal_actions + alpha * best_actions
-
-                        self.alg.transition.actions.copy_(actions)
-
-                        if hasattr(self.alg.actor_critic, 'get_actions_log_prob'):
-                            new_log_probs = self.alg.actor_critic.get_actions_log_prob(actions)
-                            self.alg.transition.actions_log_prob.copy_(new_log_probs.detach())
-
-                        
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
-
+                    energy_target = self.env.current_cot
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
