@@ -76,6 +76,8 @@ class SnnRunner_energy ( OnPolicyRunner ):
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
+        use_energy = self.cfg.get("use_energy", True)
+
         lookahead_warmup_iters = self.cfg.get("lookahead_warmup_iters", 250)
         lookahead_ramp_iters = self.cfg.get("lookahead_ramp_iters", 100) # Quante iterazioni dura il ramp-up (es. da 250 a 350)
         max_alpha = self.cfg.get("lookahead_max_alpha", 0.2)             # Peso massimo finale del lookahead (20%)
@@ -99,17 +101,19 @@ class SnnRunner_energy ( OnPolicyRunner ):
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(obs, critic_obs)
 
-                    if alpha > 0.0:
+                    if use_energy and alpha > 0.0:
                         num_envs = self.env.num_envs
                         num_actions = self.env.num_actions
-
+                        
                         nominal_actions = actions.clone()
 
+                        # Generazione candidati controllata
                         actions_expanded = nominal_actions.unsqueeze(1).repeat(1, num_candidates, 1)
                         action_std = self.alg.actor_critic.std
                         noise = torch.randn_like(actions_expanded) * action_std.unsqueeze(0).unsqueeze(0) * noise_scale
                         candidate_actions = torch.clamp(actions_expanded + noise, -1.0, 1.0)
 
+                        # Predizione dell'energia latente
                         flat_candidates = candidate_actions.view(-1, num_actions)
                         z = self.alg.energy_model.encode(obs)
                         z_flat = z.unsqueeze(1).repeat(1, num_candidates, 1).view(-1, z.shape[-1])
@@ -118,14 +122,17 @@ class SnnRunner_energy ( OnPolicyRunner ):
                         z_next_pred = self.alg.energy_model.forward_model(x)
                         energy_pred = self.alg.energy_model.energy_head(z_next_pred).view(num_envs, num_candidates)
 
+                        # Costo Bilanciato: Energia + Distanza dall'azione nominale
                         deviation = torch.norm(candidate_actions - nominal_actions.unsqueeze(1), dim=-1)
                         combined_score = energy_pred + lambda_reg * deviation
 
+                        # Selezione dell'azione migliore e blending lineare
                         best_indices = torch.argmin(combined_score, dim=1)
                         best_actions = candidate_actions[torch.arange(num_envs, device=self.device), best_indices]
 
                         actions = (1.0 - alpha) * nominal_actions + alpha * best_actions
 
+                        # Aggiornamento della transition object
                         self.alg.transition.actions.copy_(actions)
 
                         if hasattr(self.alg.actor_critic, 'get_actions_log_prob'):
