@@ -12,8 +12,8 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.utils import task_registry, get_args, set_seed, get_load_path
 from legged_gym.utils.play_logger import RobotLogger
 
-VELOCITIES = [0.75, 1, 1.25]
-SEEDS = [0,1,2,3]
+VELOCITIES = [0.5, 0.75, 1, 1.25, 1.50]
+SEEDS = [0,1,2,3,4,5,6,7,8,9,10]
 
 EPISODE_STEPS = 600 
 
@@ -68,30 +68,36 @@ def compute_metrics(logger, env):
 def run_episode(env, policy, speed, seed, env_cfg, save_dir=None, record_video=True, make_plot=True):
 
     set_seed(seed)
-    env_cfg.env.test = True
+    env_cfg.env.test = True # Nota: anche questo andrebbe fatto prima di istanziare l'env nel main, ma non fa danni qui
 
-    obs = env.get_observations()
     logger = RobotLogger()
-
     recorder = None
 
     if record_video and save_dir is not None:
         video_path = os.path.join(save_dir, "video.mp4")
         recorder = VideoRecorder(env, video_path)
 
-
+    # 1. Esegui prima il reset
     env.reset()
 
+    # 2. Imposta i comandi fissi
     env.commands[:] = 0.0
-    env.commands[:] = 0
-    env.commands[:, 0] = speed
-    env.commands[:, 1] = 0.0
-    env.commands[:, 2] = 0.0
-    env_cfg.commands.resampling_time = 100000
+    env.commands[:, 0] = speed  # Velocità X desiderata
+    env.commands[:, 1] = 0.0    # Velocità Y a zero
+    env.commands[:, 2] = 0.0    # Yaw a zero
     
+    # 3. Disabilita il resampling direttamente nell'istanza dell'ambiente
+    if hasattr(env, 'command_substeps'):
+        # In alcune versioni di legged_gym si usa questo per bloccare il resampling
+        env.command_substeps = 1000000000000000000
+    elif hasattr(env, 'cfg'):
+        env.cfg.commands.resampling_time = 100000000000000000
+
+    # 4. Prendi le osservazioni CORRETTE e AGGIORNATE dopo il reset e i comandi
+    obs = env.get_observations()
+
     try:
         for _ in range(EPISODE_STEPS):
-
             actions = policy(obs.detach())
             obs, _, _, _, _ = env.step(actions.detach())
 
@@ -105,9 +111,7 @@ def run_episode(env, policy, speed, seed, env_cfg, save_dir=None, record_video=T
             recorder.close()
 
     if make_plot and save_dir is not None:
-
         fig = plot_run(logger, env, env_cfg)
-
         plot_path = os.path.join(save_dir, "run_plot.png")
         fig.savefig(plot_path, dpi=300)
         plt.close(fig)

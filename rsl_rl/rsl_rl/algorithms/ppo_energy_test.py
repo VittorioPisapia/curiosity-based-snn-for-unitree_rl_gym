@@ -128,11 +128,9 @@ class PPO_energy (PPO):
         self.actor_critic.reset(dones)
 
     def update(self):
-
         mean_value_loss = 0
         mean_surrogate_loss = 0
         mean_energy_loss = 0
-
         mean_spike_loss = 0 if self.use_spike_loss else None
         mean_symmetry_loss = 0 if self.use_symmetry else None
 
@@ -165,15 +163,11 @@ class PPO_energy (PPO):
                     if critic_obs_batch.shape[0] == original_size:
                          critic_obs_batch = critic_obs_batch.repeat(num_aug, 1)
 
-                # 1. AGGIORNAMENTO DELLA DISTRIBUZIONE DELL'ACTOR
+                # Update delle distribuzioni della SNN (Calcola le nuove azioni differenziabili)
                 self.actor_critic.update_distribution(batch.observations, hidden_states=hid_states_batch)
-                
-                # Questa è la NUOVA azione (media) che l'Actor vuole fare ORA, dopo i primi passi di ottimizzazione
-                current_mu = self.actor_critic.action_mean
-                
                 actions_log_prob_batch = self.actor_critic.get_actions_log_prob(batch.actions)
                 value_batch = self.actor_critic.evaluate(critic_obs_batch)
-                mu_batch = self.actor_critic.action_mean
+                mu_batch = self.actor_critic.action_mean  # <-- Questa è la media dell'azione CORRENTE (ha il grafo dei gradienti attivo!)
                 sigma_batch = self.actor_critic.action_std
                 entropy_batch = self.actor_critic.entropy
 
@@ -181,7 +175,7 @@ class PPO_energy (PPO):
                 sigma_batch_orig = sigma_batch[:original_size]
                 entropy_batch_orig = entropy_batch[:original_size]
 
-                # Adaptive KL (Invariato)
+                # [KL Divergence Adaptive (lasciato invariato)]
                 if self.desired_kl != None and self.schedule == 'adaptive':
                     with torch.inference_mode():
                         kl = torch.sum(
@@ -196,63 +190,65 @@ class PPO_energy (PPO):
                         for param_group in self.optimizer.param_groups:
                             param_group['lr'] = self.learning_rate
 
-                # -----------------------------------------------------------------
-                # 2. MODEL-BASED ADVANTAGE SHAPING (L'Immaginazione Critica)
-                # -----------------------------------------------------------------
-                # Usiamo l'Energy Model come Oracolo. Valutiamo l'impatto energetico 
-                # di 'current_mu' (la nuova intenzione dell'Actor).
-                # Usiamo torch.no_grad() perché NON vogliamo calcolare gradienti qui.
-                with torch.no_grad():
-                    z_current = self.energy_model.encode(batch.observations)
-                    z_next_pred = self.energy_model.forward_model(torch.cat([z_current, current_mu], dim=-1))
-                    predicted_energy = self.energy_model.energy_head(z_next_pred) # Stima del CoT futuro
+                # -----------------------------------------------------------
+                # FASE 1: AGGIORNAMENTO DEL WORLD MODEL (ENERGY MODEL)
+                # -----------------------------------------------------------
+                # Addestriamo il modello a predire la fisica e il CoT basandoci sulle transizioni REALI salvate nel buffer.
+                self.energy_optimizer.zero_grad()
+                loss_energy = self.energy_model.compute_loss(
+                    obs_batch,
+                    actions_batch,
+                    next_obs_batch,
+                    cot_batch
+                )
+                loss_energy.backward()
+                self.energy_optimizer.step()
 
-                # Coefficiente di penalizzazione energetica (Inizia basso: 0.01 - 0.05)
-                lambda_energy_reward = 0.05
-                
-                # Modifichiamo il Vantaggio: se la nuova azione consuma troppa energia,
-                # riduciamo artificialmente il suo vantaggio. PPO smetterà di incoraggiarla.
-                # NOTA: Adattiamo le dimensioni per il calcolo del batch aumentato dalla simmetria
-                energy_penalty = predicted_energy * lambda_energy_reward
-                
-                # Se il batch è stato aumentato dalla simmetria, estendiamo anche advantages_batch
-                if advantages_batch.shape[0] != batch.advantages.shape[0]:
-                    current_advantages = batch.advantages # Già scalato se c'è data augmentation
-                else:
-                    current_advantages = advantages_batch
-
-                # Applichiamo la penalità energetica direttamente sul Vantaggio
-                shaped_advantages = current_advantages - energy_penalty
-
-                # -----------------------------------------------------------------
-                # 3. COMPUTAZIONE DELLE LOSS DI PPO (Standard)
-                # -----------------------------------------------------------------
+                # -----------------------------------------------------------
+                # FASE 2: CALCOLO DELLE LOSS PPO CLASSICHE
+                # -----------------------------------------------------------
+                # Surrogate loss
                 ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
-                
-                # Sostituiamo advantages_batch con shaped_advantages!
-                surrogate = -torch.squeeze(shaped_advantages) * ratio
-                surrogate_clipped = -torch.squeeze(shaped_advantages) * torch.clamp(ratio, 1.0 - self.clip_param,
-                                                                                1.0 + self.clip_param)
+                surrogate = -torch.squeeze(advantages_batch) * ratio
+                surrogate_clipped = -torch.squeeze(advantages_batch) * torch.clamp(ratio, 1.0 - self.clip_param, 1.0 + self.clip_param)
                 surrogate_loss = torch.max(surrogate, surrogate_clipped).mean()
 
                 # Value function loss
                 if self.use_clipped_value_loss:
-                    value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param,
-                                                                                                    self.clip_param)
+                    value_clipped = target_values_batch + (value_batch - target_values_batch).clamp(-self.clip_param, self.clip_param)
                     value_losses = (value_batch - returns_batch).pow(2)
                     value_losses_clipped = (value_clipped - returns_batch).pow(2)
                     value_loss = torch.max(value_losses, value_losses_clipped).mean()
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                # Loss totale dell'Actor (PPO standard + Symmetry + Spikes)
+                # Combinazione iniziale delle loss PPO
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
                 
+                # Symmetry loss
                 if self.symmetry_module:
                     symmetry_loss = self.symmetry_module.compute_loss(self.actor_critic.actor, batch, original_size, hidden_states=hid_states_batch)
                     if self.symmetry_module.use_mirror_loss:
                         loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
 
+                # -----------------------------------------------------------
+                # FASE 3: PUNTO 3 - OTTIMIZZAZIONE DIFFERENZIABILE DEL CoT SULLA SNN
+                # -----------------------------------------------------------
+                # Chiediamo al CoT predictor di valutare l'azione *corrente* (mu_batch) generata dalla SNN.
+                # IMPORTANTE: Usiamo batch.observations perché combacia con la dimensione di mu_batch (gestisce l'augmentation).
+                predicted_cot = self.energy_model.predict_energy(batch.observations, mu_batch)
+                
+                # Vogliamo minimizzare il CoT medio di questo batch
+                direct_cot_loss = predicted_cot.mean()
+
+                # Coefficiente di accoppiamento (Iperparametro fondamentale!)
+                # Inizia basso (es. 0.01 o 0.05) per evitare che distrugga la stabilità del PPO.
+                cot_optimization_coeff = 0.02 
+                
+                # Sommiamo alla loss finale del PPO
+                loss = loss + (direct_cot_loss * cot_optimization_coeff)
+
+                # Spike loss (Vincolo biologico della SNN)
                 if self.use_spike_loss:
                     spike_rates = self.actor_critic.actor.last_layer_spikes
                     spike_loss = 0.0
@@ -260,33 +256,17 @@ class PPO_energy (PPO):
                         rate = s.mean()
                         spike_loss += (rate - self.target_rates[l]) ** 2
                     spike_loss /= len(spike_rates)
+                    
                     loss = loss + spike_loss * self.spike_loss_coeff
-
-                # =========================================================
-                # 4. BACKPROPAGATION ACTOR CRITIC SNN
-                # =========================================================
+                
+                # -----------------------------------------------------------
+                # BACKPROPAGATION FINALE (Aggiorna la SNN)
+                # -----------------------------------------------------------
                 self.optimizer.zero_grad()
                 loss.backward()
-                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
 
-                # =========================================================
-                # 5. ADDESTRAMENTO ISOLATO DEL WORLD MODEL (L'Energy Model)
-                # =========================================================
-                # Il modello impara la fisica reale basandosi puramente sui dati passati nel buffer
-                loss_energy = self.energy_model.compute_loss(
-                    obs_batch.detach(),
-                    actions_batch.detach(),
-                    next_obs_batch.detach(),
-                    cot_batch.detach()
-                )
-                
-                self.energy_optimizer.zero_grad()
-                loss_energy.backward()
-                nn.utils.clip_grad_norm_(self.energy_model.parameters(), self.max_grad_norm)
-                self.energy_optimizer.step()
-
-                # Log delle metriche
+                # Log metrics
                 mean_value_loss += value_loss.item()
                 mean_surrogate_loss += surrogate_loss.item()
                 mean_energy_loss += loss_energy.item()
