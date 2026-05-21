@@ -85,9 +85,6 @@ class SnnRunner_energy ( OnPolicyRunner ):
         lambda_reg = self.cfg.get("lookahead_lambda_reg", 0.5)           # Penalizza azioni troppo distanti dalla policy nominale
         num_candidates = self.cfg.get("lookahead_num_candidates", 5)
 
-        intrinsic_reward = 0.0
-        beta_energy = 0.0
-
         tot_iter = self.current_learning_iteration + num_learning_iterations
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
@@ -104,79 +101,46 @@ class SnnRunner_energy ( OnPolicyRunner ):
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(obs, critic_obs)
 
-                    if   it > lookahead_warmup_iters:
-                        # Encode current observation
+                    if use_energy and alpha > 0.0:
+                        num_envs = self.env.num_envs
+                        num_actions = self.env.num_actions
+                        
+                        nominal_actions = actions.clone()
+
+                        # Generazione candidati controllata
+                        actions_expanded = nominal_actions.unsqueeze(1).repeat(1, num_candidates, 1)
+                        action_std = self.alg.actor_critic.std
+                        noise = torch.randn_like(actions_expanded) * action_std.unsqueeze(0).unsqueeze(0) * noise_scale
+                        candidate_actions = torch.clamp(actions_expanded + noise, -1.0, 1.0)
+
+                        # Predizione dell'energia latente
+                        flat_candidates = candidate_actions.view(-1, num_actions)
                         z = self.alg.energy_model.encode(obs)
+                        z_flat = z.unsqueeze(1).repeat(1, num_candidates, 1).view(-1, z.shape[-1])
 
-                        # Start imagined rollout
-                        z_pred = z.detach().clone()
+                        x = torch.cat([z_flat, flat_candidates], dim=-1)
+                        z_next_pred = self.alg.energy_model.forward_model(x)
+                        energy_pred = self.alg.energy_model.energy_head(z_next_pred).view(num_envs, num_candidates)
 
-                        # Hyperparameters
-                        horizon = 3
-                        gamma_energy = 0.95
+                        # Costo Bilanciato: Energia + Distanza dall'azione nominale
+                        deviation = torch.norm(candidate_actions - nominal_actions.unsqueeze(1), dim=-1)
+                        combined_score = energy_pred + lambda_reg * deviation
 
-                        # Accumulator
-                        predicted_future_cot = torch.zeros(
-                            self.env.num_envs,
-                            device=self.device
-                        )
+                        # Selezione dell'azione migliore e blending lineare
+                        best_indices = torch.argmin(combined_score, dim=1)
+                        best_actions = candidate_actions[torch.arange(num_envs, device=self.device), best_indices]
 
-                        # Repeat SAME action over horizon
-                        for h in range(horizon):
+                        actions = (1.0 - alpha) * nominal_actions + alpha * best_actions
 
-                            # Transition input
-                            x = torch.cat([z_pred, actions], dim=-1)
+                        # Aggiornamento della transition object
+                        self.alg.transition.actions.copy_(actions)
 
-                            # Predict next latent
-                            z_pred = self.alg.energy_model.forward_model(x)
+                        if hasattr(self.alg.actor_critic, 'get_actions_log_prob'):
+                            new_log_probs = self.alg.actor_critic.get_actions_log_prob(actions)
+                            self.alg.transition.actions_log_prob.copy_(new_log_probs.detach())
 
-                            # Predict future COT
-                            cot_pred = self.alg.energy_model.energy_head(
-                                z_pred
-                            ).squeeze(-1)
-
-                            # Discounted accumulation
-                            predicted_future_cot += (
-                                (gamma_energy ** h) * cot_pred
-                            )
-
-                        # ==========================================
-                        # Running mean normalization
-                        # ==========================================
-
-                        if not hasattr(self, "running_future_cot_mean"):
-
-                            self.running_future_cot_mean = (
-                                predicted_future_cot.mean()
-                            )
-
-                        self.running_future_cot_mean = (
-                            0.99 * self.running_future_cot_mean
-                            + 0.01 * predicted_future_cot.mean()
-                        )
-
-                        # ==========================================
-                        # Relative intrinsic reward
-                        # ==========================================
-
-                        intrinsic_reward = (
-                            self.running_future_cot_mean
-                            - predicted_future_cot
-                        )
-
-                        # IMPORTANT for stability
-                        intrinsic_reward = torch.clamp(
-                            intrinsic_reward,
-                            -0.5,
-                            0.5
-                        )
-
-                        # Small coefficient
-                        beta_energy = 0.002
-
+                        
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
-
-                    rewards += beta_energy * intrinsic_reward
 
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)

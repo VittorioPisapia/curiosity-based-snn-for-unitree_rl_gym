@@ -12,8 +12,8 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.utils import task_registry, get_args, set_seed, get_load_path
 from legged_gym.utils.play_logger import RobotLogger
 
-VELOCITIES = [0.75, 1.25]
-SEEDS = [0]
+VELOCITIES = [0.75, 1, 1.25]
+SEEDS = [0,1,2,3]
 
 EPISODE_STEPS = 600 
 
@@ -23,27 +23,44 @@ def compute_metrics(logger, env):
         dict with CoT, tracking error, etc.
     """
 
-    cmd = np.array(logger.cmd_vel_x)
-    act = np.array(logger.act_vel_x)
+    # =========================
+    # Global temporal mask
+    # =========================
 
-    # velocity tracking error
+    time_axis = np.arange(logger.num_steps) * env.dt
+
+    mask = time_axis >= 3.0
+
+    # =========================
+    # Apply mask to all signals
+    # =========================
+
+    cmd = np.array(logger.cmd_vel_x)[mask]
+    act = np.array(logger.act_vel_x)[mask]
+
+    cot = np.array(logger.cot)[mask]
+
+    contacts = np.array(logger.contacts)[mask]
+
+    # =========================
+    # Metrics
+    # =========================
+
     vel_err = np.abs(cmd - act)
 
     rmse = np.sqrt(np.mean((cmd - act) ** 2))
     mae = np.mean(vel_err)
 
-    # CoT
-    cot = np.array(logger.cot)
     cot_mean = np.mean(cot)
+    cot_std = np.std(cot)
 
-    contacts = np.array(logger.contacts)
     contact_variance = np.var(contacts)
 
     return {
         "rmse": rmse,
         "mae": mae,
         "cot": cot_mean,
-        "cot_std": np.std(cot),
+        "cot_std": cot_std,
         "contact_var": contact_variance
     }
 
@@ -70,7 +87,8 @@ def run_episode(env, policy, speed, seed, env_cfg, save_dir=None, record_video=T
     env.commands[:, 0] = speed
     env.commands[:, 1] = 0.0
     env.commands[:, 2] = 0.0
-
+    env_cfg.commands.resampling_time = 100000
+    
     try:
         for _ in range(EPISODE_STEPS):
 
