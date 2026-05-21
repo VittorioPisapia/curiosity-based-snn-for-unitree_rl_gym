@@ -68,63 +68,16 @@ class SnnRunner_energy ( OnPolicyRunner ):
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
-        lookahead_warmup_iters = self.cfg.get("lookahead_warmup_iters", 500)
-
-        intrinsic_reward = 0.0
-        horizon = 3
-        gamma_energy = 0.95
-        beta_energy = 0.004
-
         tot_iter = self.current_learning_iteration + num_learning_iterations
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
-            
-            # Reset degli accumulatori a ogni iterazione
-            mean_intrinsic_reward_acc = 0.0
-            mean_predicted_cot_acc = 0.0
-            clamped_fraction_acc = 0.0
-            mean_cot_error_acc = 0.0
 
             # Rollout
             with torch.inference_mode():
                 for i in range(self.num_steps_per_env):
                     actions = self.alg.act(obs, critic_obs)
 
-                    z = self.alg.energy_model.encode(obs)
-
-                    if it > lookahead_warmup_iters:
-                        z_pred = z.detach().clone()
-                        predicted_future_cot = torch.zeros(self.env.num_envs, device=self.device)
-
-                        for h in range(horizon):
-                            x = torch.cat([z_pred, actions], dim=-1)
-                            z_pred = self.alg.energy_model.forward_model(x)
-                            cot_pred = self.alg.energy_model.energy_head(z_pred).squeeze(-1)
-                            predicted_future_cot += (gamma_energy ** h) * cot_pred
-
-                        if not hasattr(self, "running_future_cot_mean"):
-                            self.running_future_cot_mean = predicted_future_cot.mean()
-
-                        self.running_future_cot_mean = (
-                            0.99 * self.running_future_cot_mean + 0.01 * predicted_future_cot.mean()
-                        )
-
-                        intrinsic_reward = self.running_future_cot_mean - predicted_future_cot
-                        intrinsic_reward = torch.clamp(intrinsic_reward, -0.5, 0.5)
-
-                        clamped_ratio = (intrinsic_reward.abs() == 0.5).float().mean().item()
-
-                        mean_intrinsic_reward_acc += intrinsic_reward.mean().item()
-                        mean_predicted_cot_acc += predicted_future_cot.mean().item()
-                        clamped_fraction_acc += clamped_ratio
-
                     obs, privileged_obs, rewards, dones, infos = self.env.step(actions)
-
-                    current_cot_pred = self.alg.energy_model.energy_head(z).squeeze(-1)
-                    cot_prediction_error = torch.abs(current_cot_pred - self.env.current_cot).mean().item()
-                    mean_cot_error_acc += cot_prediction_error
-
-                    rewards += beta_energy * intrinsic_reward
 
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
@@ -145,11 +98,6 @@ class SnnRunner_energy ( OnPolicyRunner ):
 
                 stop = time.time()
                 collection_time = stop - start
-
-                mean_intrinsic_reward = mean_intrinsic_reward_acc / self.num_steps_per_env
-                mean_predicted_cot = mean_predicted_cot_acc / self.num_steps_per_env
-                clamped_fraction = clamped_fraction_acc / self.num_steps_per_env
-                mean_cot_error = mean_cot_error_acc / self.num_steps_per_env
 
                 # Learning step
                 start = stop
@@ -208,14 +156,6 @@ class SnnRunner_energy ( OnPolicyRunner ):
         if locs.get('mean_symmetry_loss') is not None:
             self.writer.add_scalar('Loss/symmetry_loss', locs['mean_symmetry_loss'], locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
-        
-        self.writer.add_scalar('Energy_Bonus/mean_intrinsic_reward', locs['mean_intrinsic_reward'], locs['it'])
-        self.writer.add_scalar('Energy_Bonus/mean_predicted_cot', locs['mean_predicted_cot'], locs['it'])
-        self.writer.add_scalar('Energy_Bonus/clamped_fraction', locs['clamped_fraction'], locs['it'])
-        self.writer.add_scalar('Energy_Bonus/mean_cot_prediction_error', locs['mean_cot_error'], locs['it'])
-        
-        if hasattr(self, "running_future_cot_mean"):
-            self.writer.add_scalar('Energy_Bonus/running_future_cot_mean', self.running_future_cot_mean.item(), locs['it'])
 
         for layer_idx, rate in enumerate(spike_rates):
             self.writer.add_scalar(f'SNN/layer_{layer_idx}_spike_rate', rate, locs['it'])
