@@ -177,19 +177,28 @@ def main():
 
     benchmark_dirs = [
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/1500_plane_symmetry/benchmark",
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/May22_15-29-01_/benchmark",
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/1500_symmetry_0.0013/benchmark",
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_1500_plane/benchmark",
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/1500_plane_symmetry_spike/benchmark",
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/spike_0.1_0.01/benchmark",
+
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/1500_spike_0.5/benchmark",
+
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/1500_plane/benchmark",
+
+
 
         # add more here
     ]
 
     labels = [
-        "rnd1",
-        "rnd2",
-        "snn",
+        "energy_loss",
+        "baseline_snn",
+        "spike_loss (0.1)",
+        "spike_loss (0.5)",
+        "baseline",
+
     ]
 
     compare_benchmarks(

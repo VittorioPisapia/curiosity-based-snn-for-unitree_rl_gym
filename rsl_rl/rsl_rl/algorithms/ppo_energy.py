@@ -6,6 +6,7 @@ from rsl_rl.modules.actor_critic import ActorCriticSNN
 from rsl_rl.storage.rollout_storage_energy import RolloutStorage_Snn_energy
 from rsl_rl.algorithms.ppo import PPO
 from rsl_rl.modules.energy_model import EnergyForwardModel
+from rsl_rl.modules.rnd import RandomNetworkDistillation
 from rsl_rl.modules.normalization import EmpiricalNormalization, EmpiricalDiscountedVariationNormalization
 from rsl_rl.modules.symmetry import DummyBatch, Symmetry
 
@@ -14,6 +15,8 @@ class PPO_energy (PPO):
     def __init__(self,
                  env,
                  actor_critic,
+                 use_rnd,
+                 rnd,
                  use_symmetry,
                  symmetry,
                  use_spike_loss,
@@ -53,18 +56,23 @@ class PPO_energy (PPO):
                 self.energy_model.parameters(),
                 lr=learning_rate
                 )
+        
+        self.update_counter = 0
+        self.warmup_updates = 500   
+        self.target_cot_coeff = 0.1
 
         # Symmetry
         self.use_symmetry = use_symmetry
         self.symmetry_module = Symmetry(env=self.env, **symmetry) if use_symmetry else None
-
+        
+        # Spike Loss
         self.use_spike_loss = use_spike_loss
         self.target_rates = spike_rate_target
         self.spike_loss_coeff = spike_loss_coeff
 
-        self.update_counter = 0
-        self.warmup_updates = 500
-        self.target_cot_coeff = 0.1
+        # RND
+        self.use_rnd = use_rnd
+        self.rnd = RandomNetworkDistillation(device=self.device, **rnd) if self.use_rnd else None
 
         # PPO components
         self.actor_critic = actor_critic
@@ -138,6 +146,7 @@ class PPO_energy (PPO):
         mean_energy_loss = 0
         mean_spike_loss = 0 if self.use_spike_loss else None
         mean_symmetry_loss = 0 if self.use_symmetry else None
+        mean_rnd_loss = 0 if self.use_rnd else None
 
         self.update_counter += 1
 
@@ -235,6 +244,23 @@ class PPO_energy (PPO):
                     if self.symmetry_module.use_mirror_loss:
                         loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
 
+                if self.use_rnd:
+                    obs_lin_vel    = obs_batch[:, 0:3]
+                    obs_ang_vel    = obs_batch[:, 3:6]
+                    obs_proj_grav  = obs_batch[:, 6:9]
+                    obs_commands   = obs_batch[:, 9:12]
+                    obs_dof_pos    = obs_batch[:, 12:24]
+                    obs_dof_vel    = obs_batch[:, 24:36]
+                    obs_last_act   = obs_batch[:, 36:48] 
+
+                    obs_batch_for_rnd = torch.cat((obs_lin_vel,obs_dof_pos,obs_dof_vel), dim=-1)    #+187 add it for height measurements
+                    
+                    #normalized_obs_batch = self.state_normalizer(obs_batch_for_rnd)
+                    
+                    rnd_loss = self.rnd.compute_loss(obs_batch_for_rnd)
+                else:
+                    rnd_loss = None
+
                 if cot_optimization_coeff > 0.0:
                     predicted_cot = self.energy_model.predict_energy(batch.observations, mu_batch)
                     direct_cot_loss = predicted_cot.mean()
@@ -254,7 +280,17 @@ class PPO_energy (PPO):
 
                 self.optimizer.zero_grad()
                 loss.backward()
+                
+                if self.use_rnd:
+                    self.rnd.optimizer.zero_grad()
+                    rnd_loss.backward()
+
+                nn.utils.clip_grad_norm_(self.actor_critic.parameters(), self.max_grad_norm)
                 self.optimizer.step()
+
+                if self.use_rnd:
+                    self.rnd.optimizer.step()
+            
 
                 # Log metrics
                 mean_value_loss += value_loss.item()
@@ -262,6 +298,8 @@ class PPO_energy (PPO):
                 mean_energy_loss += loss_energy.item()
                 if mean_spike_loss is not None:
                     mean_spike_loss += spike_loss.item()
+                if mean_rnd_loss is not None:
+                    mean_rnd_loss += rnd_loss.item()
                 if mean_symmetry_loss is not None:
                     mean_symmetry_loss += symmetry_loss.item()
 
@@ -274,7 +312,9 @@ class PPO_energy (PPO):
             mean_spike_loss /= num_updates
         if mean_symmetry_loss is not None:
             mean_symmetry_loss /= num_updates
+        if mean_rnd_loss is not None:
+            mean_rnd_loss /= num_updates
 
         self.storage.clear()
 
-        return mean_value_loss, mean_surrogate_loss, mean_symmetry_loss, mean_spike_loss, mean_energy_loss
+        return mean_value_loss, mean_surrogate_loss, mean_symmetry_loss, mean_spike_loss, mean_energy_loss, mean_rnd_loss

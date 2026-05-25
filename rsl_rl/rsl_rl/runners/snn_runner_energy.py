@@ -24,6 +24,9 @@ class SnnRunner_energy ( OnPolicyRunner ):
         self.device = device
         self.env = env
 
+        self.use_rnd = self.alg_cfg["use_rnd"]
+        self.rnd_cfg = self.alg_cfg["rnd"]
+
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
         else:
@@ -65,12 +68,16 @@ class SnnRunner_energy ( OnPolicyRunner ):
         ep_infos = []
         rewbuffer = deque(maxlen=100)
         lenbuffer = deque(maxlen=100)
+        ext_rewbuffer = deque(maxlen=100)
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
         tot_iter = self.current_learning_iteration + num_learning_iterations
         for it in range(self.current_learning_iteration, tot_iter):
             start = time.time()
+
+            mean_intrinsic_reward = 0.0 
+            mean_extrinsic_reward = 0.0
 
             # Rollout
             with torch.inference_mode():
@@ -82,19 +89,45 @@ class SnnRunner_energy ( OnPolicyRunner ):
                     critic_obs = privileged_obs if privileged_obs is not None else obs
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
+                    obs_lin_vel    = obs[:, 0:3]
+                    obs_ang_vel    = obs[:, 3:6]
+                    obs_proj_grav  = obs[:, 6:9]
+                    obs_commands   = obs[:, 9:12]
+                    obs_dof_pos    = obs[:, 12:24]
+                    obs_dof_vel    = obs[:, 24:36]
+                    obs_last_act   = obs[:, 36:48] 
+
+                    obs_for_rnd = torch.cat((obs_lin_vel,obs_dof_pos,obs_dof_vel), dim=-1)
+
+                    intrinsic_rewards = self.alg.rnd.get_intrinsic_reward(obs_for_rnd) if self.use_rnd else None
+
+                    mean_extrinsic_reward += rewards.mean().item()
+                    if self.use_rnd:
+                        total_rewards = rewards + intrinsic_rewards
+
+                        if self.use_rnd:
+                            total_rewards = rewards + intrinsic_rewards
+                            mean_intrinsic_reward += intrinsic_rewards.mean().item()
+
+                    else:
+                        total_rewards = rewards
+
                     energy_target = self.env.current_cot.unsqueeze(-1)
                     self.alg.process_env_step(obs, rewards, dones, infos, energy_target)
                     
                     if self.log_dir is not None:
                         if 'episode' in infos:
                             ep_infos.append(infos['episode'])
-                        cur_reward_sum += rewards
+                        cur_reward_sum += total_rewards
+                        cur_ext_reward_sum += rewards
                         cur_episode_length += 1
                         new_ids = (dones > 0).nonzero(as_tuple=False)
                         rewbuffer.extend(cur_reward_sum[new_ids][:, 0].cpu().numpy().tolist())
+                        ext_rewbuffer.extend(cur_ext_reward_sum[new_ids][:, 0].cpu().numpy().tolist())
                         lenbuffer.extend(cur_episode_length[new_ids][:, 0].cpu().numpy().tolist())
                         cur_reward_sum[new_ids] = 0
                         cur_episode_length[new_ids] = 0
+                        cur_ext_reward_sum[new_ids] = 0
 
                 stop = time.time()
                 collection_time = stop - start
@@ -103,7 +136,7 @@ class SnnRunner_energy ( OnPolicyRunner ):
                 start = stop
                 self.alg.compute_returns(critic_obs)
             
-            mean_value_loss, mean_surrogate_loss, mean_symmetry_loss, mean_spike_loss, mean_energy_loss = self.alg.update()
+            mean_value_loss, mean_surrogate_loss, mean_symmetry_loss, mean_spike_loss, mean_energy_loss, mean_rnd_loss = self.alg.update()
 
             stop = time.time()
             learn_time = stop - start
@@ -155,6 +188,8 @@ class SnnRunner_energy ( OnPolicyRunner ):
         self.writer.add_scalar('Loss/learning_rate', self.alg.learning_rate, locs['it'])
         if locs.get('mean_symmetry_loss') is not None:
             self.writer.add_scalar('Loss/symmetry_loss', locs['mean_symmetry_loss'], locs['it'])
+        if locs.get('mean_rnd_loss') is not None:
+            self.writer.add_scalar('Loss/rnd_loss', locs['mean_rnd_loss'], locs['it'])
         self.writer.add_scalar('Policy/mean_noise_std', mean_std.item(), locs['it'])
 
         for layer_idx, rate in enumerate(spike_rates):
@@ -169,9 +204,12 @@ class SnnRunner_energy ( OnPolicyRunner ):
         
         if len(locs['rewbuffer']) > 0:
             self.writer.add_scalar('Train/mean_reward', statistics.mean(locs['rewbuffer']), locs['it'])
+            self.writer.add_scalar('Train/mean_extrinsic_reward', statistics.mean(locs['ext_rewbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_episode_length', statistics.mean(locs['lenbuffer']), locs['it'])
             self.writer.add_scalar('Train/mean_reward/time', statistics.mean(locs['rewbuffer']), self.tot_time)
             self.writer.add_scalar('Train/mean_episode_length/time', statistics.mean(locs['lenbuffer']), self.tot_time)
+            if self.use_rnd:
+                self.writer.add_scalar('Train/mean_intrinsic_reward_step', locs['mean_intrinsic_reward'] / self.num_steps_per_env, locs['it'])
 
         str_title = f" \033[1m Learning iteration {locs['it']}/{self.current_learning_iteration + locs['num_learning_iterations']} \033[0m "
         snn_string = ""
@@ -195,6 +233,7 @@ class SnnRunner_energy ( OnPolicyRunner ):
               f"""{'Mean action noise std:':>{pad}} {mean_std.item():.2f}\n"""
               f"""{snn_string}\n"""
               f"""{'Mean reward:':>{pad}} {statistics.mean(locs['rewbuffer']):.2f}\n"""
+              f"""{'Mean extrinsic reward:':>{pad}} {statistics.mean(locs['ext_rewbuffer']):.2f}\n"""
               f"""{'Mean episode length:':>{pad}} {statistics.mean(locs['lenbuffer']):.2f}\n""")
         else:
             log_string = (f"""{'#' * width}\n"""
