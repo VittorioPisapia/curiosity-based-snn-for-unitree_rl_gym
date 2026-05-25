@@ -187,6 +187,8 @@ def main():
 
         "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/1500_plane/benchmark",
 
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/all/benchmark"
+
 
 
         # add more here
@@ -198,6 +200,7 @@ def main():
         "spike_loss (0.1)",
         "spike_loss (0.5)",
         "baseline",
+        "all"
 
     ]
 
