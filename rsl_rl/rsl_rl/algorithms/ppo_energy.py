@@ -64,7 +64,7 @@ class PPO_energy (PPO):
 
         self.update_counter = 0
         self.warmup_updates = 500
-        self.target_cot_coeff = 0.01
+        self.target_cot_coeff = 0.1
 
         # PPO components
         self.actor_critic = actor_critic
@@ -144,7 +144,6 @@ class PPO_energy (PPO):
         if self.update_counter < self.warmup_updates:
             cot_optimization_coeff = 0.0 
         else:
-            # Rampa lineare che si sviluppa nelle successive 50 iterazioni
             rampa = min(1.0, (self.update_counter - self.warmup_updates) / 50)
             cot_optimization_coeff = self.target_cot_coeff * rampa
 
@@ -177,11 +176,11 @@ class PPO_energy (PPO):
                     if critic_obs_batch.shape[0] == original_size:
                          critic_obs_batch = critic_obs_batch.repeat(num_aug, 1)
 
-                # Update delle distribuzioni della SNN (Calcola le nuove azioni differenziabili)
+               
                 self.actor_critic.update_distribution(batch.observations, hidden_states=hid_states_batch)
                 actions_log_prob_batch = self.actor_critic.get_actions_log_prob(batch.actions)
                 value_batch = self.actor_critic.evaluate(critic_obs_batch)
-                mu_batch = self.actor_critic.action_mean  # <-- Questa è la media dell'azione CORRENTE (ha il grafo dei gradienti attivo!)
+                mu_batch = self.actor_critic.action_mean 
                 sigma_batch = self.actor_critic.action_std
                 entropy_batch = self.actor_critic.entropy
 
@@ -189,7 +188,6 @@ class PPO_energy (PPO):
                 sigma_batch_orig = sigma_batch[:original_size]
                 entropy_batch_orig = entropy_batch[:original_size]
 
-                # [KL Divergence Adaptive (lasciato invariato)]
                 if self.desired_kl != None and self.schedule == 'adaptive':
                     with torch.inference_mode():
                         kl = torch.sum(
@@ -204,10 +202,6 @@ class PPO_energy (PPO):
                         for param_group in self.optimizer.param_groups:
                             param_group['lr'] = self.learning_rate
 
-                # -----------------------------------------------------------
-                # FASE 1: AGGIORNAMENTO DEL WORLD MODEL (ENERGY MODEL)
-                # -----------------------------------------------------------
-                # Addestriamo il modello a predire la fisica e il CoT basandoci sulle transizioni REALI salvate nel buffer.
                 self.energy_optimizer.zero_grad()
                 loss_energy = self.energy_model.compute_loss(
                     obs_batch,
@@ -218,9 +212,6 @@ class PPO_energy (PPO):
                 loss_energy.backward()
                 self.energy_optimizer.step()
 
-                # -----------------------------------------------------------
-                # FASE 2: CALCOLO DELLE LOSS PPO CLASSICHE
-                # -----------------------------------------------------------
                 # Surrogate loss
                 ratio = torch.exp(actions_log_prob_batch - torch.squeeze(old_actions_log_prob_batch))
                 surrogate = -torch.squeeze(advantages_batch) * ratio
@@ -236,7 +227,6 @@ class PPO_energy (PPO):
                 else:
                     value_loss = (returns_batch - value_batch).pow(2).mean()
 
-                # Combinazione iniziale delle loss PPO
                 loss = surrogate_loss + self.value_loss_coef * value_loss - self.entropy_coef * entropy_batch.mean()
                 
                 # Symmetry loss
@@ -245,15 +235,12 @@ class PPO_energy (PPO):
                     if self.symmetry_module.use_mirror_loss:
                         loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
 
-
-                # Se il coefficiente è 0, saltiamo il calcolo per risparmiare tempo, 
-                # altrimenti lo eseguiamo solo quando serve!
                 if cot_optimization_coeff > 0.0:
                     predicted_cot = self.energy_model.predict_energy(batch.observations, mu_batch)
                     direct_cot_loss = predicted_cot.mean()
                     loss = loss + (direct_cot_loss * cot_optimization_coeff)
 
-                # Spike loss (Vincolo biologico della SNN)
+
                 if self.use_spike_loss:
                     spike_rates = self.actor_critic.actor.last_layer_spikes
                     spike_loss = 0.0
@@ -264,9 +251,7 @@ class PPO_energy (PPO):
                     
                     loss = loss + spike_loss * self.spike_loss_coeff
                 
-                # -----------------------------------------------------------
-                # BACKPROPAGATION FINALE (Aggiorna la SNN)
-                # -----------------------------------------------------------
+
                 self.optimizer.zero_grad()
                 loss.backward()
                 self.optimizer.step()
