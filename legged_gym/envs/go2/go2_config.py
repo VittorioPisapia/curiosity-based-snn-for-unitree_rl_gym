@@ -18,11 +18,11 @@ class GO2RoughCfg( LeggedRobotCfg ):
             'RL_calf_joint': -1.5,    # [rad]
             'FR_calf_joint': -1.5,  # [rad]
             'RR_calf_joint': -1.5,    # [rad]
-        }
+        } #.9 1.1
 
     class control( LeggedRobotCfg.control ):
         # PD Drive parameters:
-        control_type = 'P'
+        control_type = 'P' #.9 1.1
         stiffness = {'joint': 20.}  # [N*m/rad]
         damping = {'joint': 0.5}     # [N*m*s/rad]
         # action scale: target angle = actionScale * action + defaultAngle

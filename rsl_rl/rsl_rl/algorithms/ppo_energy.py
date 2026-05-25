@@ -59,7 +59,7 @@ class PPO_energy (PPO):
         
         self.update_counter = 0
         self.warmup_updates = 500   
-        self.target_cot_coeff = 0.1
+        self.target_cot_coeff = 0.2
 
         # Symmetry
         self.use_symmetry = use_symmetry
