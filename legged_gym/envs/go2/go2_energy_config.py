@@ -41,6 +41,8 @@ class GO2RoughEnergyCfgPPO( GO2RoughCfgPPO):
         class energy:
             forward_loss_coeff = 0.5
             energy_loss_coeff = 0.1
+            warmup_updates = 500
+            target_cot_coeff = 0.2
 
 
         
