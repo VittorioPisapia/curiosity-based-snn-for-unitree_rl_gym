@@ -46,20 +46,27 @@ class PPO_energy (PPO):
         self.env = env
 
         # Energy Model
+        self.update_counter = 0
+        self.energy_cfg = energy
+        self.warmup_updates = self.energy_cfg["warmup_updates"]   
+        self.target_cot_coeff = self.energy_cfg["target_cot_coeff"]
+
+        energy_model_cfg = {
+            k: v for k, v in energy.items() 
+            if k not in ["warmup_updates", "target_cot_coeff"]
+        }
+
         self.energy_model = EnergyForwardModel(
                 obs_dim=48,      
                 action_dim=12,
                 device=self.device,
-                **energy
+                **energy_model_cfg
             ).to(self.device)
         self.energy_optimizer = optim.Adam(
                 self.energy_model.parameters(),
                 lr=learning_rate
                 )
         
-        self.update_counter = 0
-        self.warmup_updates = 500   
-        self.target_cot_coeff = 0.1
 
         # Symmetry
         self.use_symmetry = use_symmetry

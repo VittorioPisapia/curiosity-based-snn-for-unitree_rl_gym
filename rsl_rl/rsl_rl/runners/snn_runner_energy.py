@@ -70,6 +70,7 @@ class SnnRunner_energy ( OnPolicyRunner ):
         lenbuffer = deque(maxlen=100)
         ext_rewbuffer = deque(maxlen=100)
         cur_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
+        cur_ext_reward_sum = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
         cur_episode_length = torch.zeros(self.env.num_envs, dtype=torch.float, device=self.device)
 
         tot_iter = self.current_learning_iteration + num_learning_iterations

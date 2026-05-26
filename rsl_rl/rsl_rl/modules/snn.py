@@ -4,36 +4,54 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F 
 import math
-from typing import List, Dict, Union, Any, Tuple
+from typing import List, Dict, Union, Any, Tuple, Optional
 from abc import abstractmethod
 
 
+from typing import List, Dict, Union, Any, Tuple, Optional
+import torch
+import torch.nn as nn
+from abc import abstractmethod
+
 class Neurons(nn.Module):
+    # Type hinting a livello di classe (fondamentale per TorchScript)
+    hidden_states_names: List[str]
+    hidden_states_tensors: Dict[str, torch.Tensor]
+
     def __init__(
             self,
             hidden_states_names: List[str],
-            grad: torch.autograd.Function,
+            grad: Any,
             device: Union[str, torch.device],
         ) -> None:
         super().__init__()
 
         self.device = torch.device(device) if isinstance(device, str) else device
-        self.spike_function = grad.apply
+        self.spike_function = grad.apply if grad is not None else None
+        
         self.hidden_states_names = hidden_states_names
-        self.hidden_states_tensors = {k: None for k in self.hidden_states_names}
+        
+        # IL TRUCCO PER TORCHSCRIPT: 
+        # Inizializziamo il dizionario con tensori dummy (dimensione 0).
+        # In questo modo, il JIT vede che ci sono stringhe come chiavi e Tensori come valori!
+        self.hidden_states_tensors = {
+            name: torch.empty(0, device=self.device) for name in self.hidden_states_names
+        }
 
-    def _set_hidden_states(self, hidden_states: Dict[str, Any], size: Tuple[int, int]):
+    def _set_hidden_states(self, hidden_states: Dict[str, torch.Tensor], size: List[int]):
         """
-        size: batch, no neurons
+        size: [batch, no_neurons]
         """
         for name in self.hidden_states_names:
-            _hstate = hidden_states.get(name, None)
-            if _hstate is None:
-                _hstate = torch.zeros(*size, dtype=torch.float32, device=self.device)
+            if name in hidden_states:
+                _hstate = hidden_states[name]
+            else:
+                _hstate = torch.zeros(size, dtype=torch.float32, device=self.device)
+                
             self.hidden_states_tensors[name] = _hstate.clone()
     
     @abstractmethod
-    def forward(self, x, hidden_states, spiking_neurons):
+    def forward(self, x: torch.Tensor, hidden_states: Dict[str, torch.Tensor], spiking_neurons: bool):
         pass
 
 class SpikeFunctionGaussian(torch.autograd.Function):
@@ -71,29 +89,37 @@ class LIFGaussian(Neurons):
         super().__init__(["snn_s", "snn_m"], SpikeFunctionGaussian, device)
         self.lens = lens
 
-    def forward(self, x, thresholds, decays, hidden_states, spiking_neurons):
-        output = {}
-        batch_sz, layer_sz = x.shape[0], x.shape[1]
-
-        self._set_hidden_states(hidden_states, (batch_sz, layer_sz))
-
-        # SOFT RESET  #TODO: try soft-reset of the membrane potential, i.e. reset to v - thresh instead of 0
-
-        # v_prev = self.hidden_states_tensors["snn_m"] 
-        # if spiking_neurons:
-        #     v_prev = v_prev * -(self.hidden_states_tensors["snn_s"]*thresholds)
-        # decayed_m = v_prev * decays
-        # output["snn_m"] = decayed_m + x
-            
-        spikes_reset = 1  # if 0 the previous v mem is reset
-        if spiking_neurons:
-            spikes_reset = 1 - self.hidden_states_tensors["snn_s"]
-
-            #spikes_reset = 0.8 + 0.2 * (1 - self.hidden_states_tensors["snn_s"])   # Partial reset
+    def forward(self, x: torch.Tensor, thresholds: torch.Tensor, decays: torch.Tensor, 
+                hidden_states: Dict[str, torch.Tensor], spiking_neurons: bool) -> Dict[str, torch.Tensor]:
         
-        output["snn_m"] = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
+        batch_sz = x.shape[0]
+        layer_sz = x.shape[1]
+
+        self._set_hidden_states(hidden_states, [batch_sz, layer_sz])
+
+        spikes_reset = 1.0
         if spiking_neurons:
-            output["snn_s"] = self.spike_function(output["snn_m"], thresholds, self.lens)
+            spikes_reset = 1.0 - self.hidden_states_tensors["snn_s"]
+        
+        # Calcoliamo prima la membrana
+        snn_m_out = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
+        
+        # Calcoliamo gli spike
+        if spiking_neurons:
+            if torch.jit.is_scripting():
+                snn_s_out = snn_m_out.gt(thresholds).float()
+            else:
+                snn_s_out = self.spike_function(snn_m_out, thresholds, self.lens)
+        else:
+            snn_s_out = torch.zeros_like(snn_m_out)
+                
+        # Creiamo il dizionario GIA' POPOLATO in un'unica istruzione
+        # Questo previene qualsiasi errore "Dictionary inputs must have entries"
+        output: Dict[str, torch.Tensor] = {
+            "snn_m": snn_m_out,
+            "snn_s": snn_s_out
+        }
+        
         return output
     
 class SpikeFunctionBPTT(torch.autograd.Function):
@@ -196,36 +222,34 @@ class SNN(nn.Module):
         self.last_threshold_mean = 0.0
         self.last_threshold_std = 0.0
 
-    def _neurons_forward(self, x, hidden_states, start_idx, end_idx, output_spikes=True):
-        local_states = {}
+    def _neurons_forward(self, x: torch.Tensor, hidden_states: Dict[str, torch.Tensor], start_idx: int, end_idx: int, output_spikes: bool = True) -> Dict[str, torch.Tensor]:
+        
+        # Dizionario inizializzato in modo JIT-safe
+        local_states = torch.jit.annotate(Dict[str, torch.Tensor], {})
 
         for hname in self.fs.hidden_states_names:
-            h = hidden_states.get(hname, None)
-            if h is None:
-                local_states[hname] = None
-            else:
-                local_states[hname] = h[:, start_idx:end_idx].clone()
+            if hname in hidden_states:
+                local_states[hname] = hidden_states[hname][:, start_idx:end_idx].clone()
+            # Se manca, LIFGaussian provvederà a creare gli zero tensor internamente
 
         decays = torch.sigmoid(self.decays_raw[start_idx:end_idx])
-        #thresholds = torch.sigmoid(self.thresholds_raw[start_idx:end_idx])
+        # thresholds = torch.sigmoid(self.thresholds_raw[start_idx:end_idx])
         thresholds = torch.relu(self.thresholds_raw[start_idx:end_idx]) + 0.1
 
         return self.fs(
             x,
-            #self.thresholds[start_idx:end_idx] if output_spikes else None,
             thresholds,
             decays,
             local_states,
             output_spikes
         )
 
-    def forward(self, obs, hidden_states, st=1):
+    def forward(self, obs: torch.Tensor, hidden_states: Optional[Dict[str, torch.Tensor]] = None, st: int = 1) -> Tuple[torch.Tensor, Dict[str, torch.Tensor]]:
 
         obs = obs.to(self.device)
         obs = self.input_norm(obs)
 
         batch_size = obs.shape[0]
-        st = int(st)
 
         if hidden_states is None:
             current_state = {
@@ -238,11 +262,17 @@ class SNN(nn.Module):
                 "snn_s": hidden_states["snn_s"].clone(),
             }
 
+        # 1. DICHIARAZIONE NELLO SCOPE ESTERNO (Risolve l'errore 'undefined value')
+        new_mems: List[torch.Tensor] = []
+        new_spikes: List[torch.Tensor] = []
+
         for _ in range(st):
 
             x = obs
-            new_mems = []
-            new_spikes = []
+            
+            # 2. RE-INIZIALIZZAZIONE AD OGNI STEP TEMPORALE (Se st > 1)
+            new_mems = torch.jit.annotate(List[torch.Tensor], [])
+            new_spikes = torch.jit.annotate(List[torch.Tensor], [])
             start_idx = 0
 
             for layer_idx, layer in enumerate(self.layers):
@@ -262,38 +292,28 @@ class SNN(nn.Module):
 
                 new_mems.append(h["snn_m"])
                 new_spikes.append(h["snn_s"])
-
-                self.last_spike_rates[layer_idx] = (
-                    h["snn_s"].mean().item()
-                )
-
-                self.last_membrane_means[layer_idx] = (
-                    h["snn_m"].mean().item()
-                )
-
-                self.last_membrane_stds[layer_idx] = (
-                    h["snn_m"].std().item()
-                )
+                
+                if not torch.jit.is_scripting():
+                    self.last_spike_rates[layer_idx] = h["snn_s"].mean().item()
+                    self.last_membrane_means[layer_idx] = h["snn_m"].mean().item()
+                    self.last_membrane_stds[layer_idx] = h["snn_m"].std().item()
 
                 start_idx = end_idx
             
             current_state = {
                 "snn_m" : torch.cat(new_mems, dim=1),
-                "snn_s" : torch.cat(new_spikes,dim=1)
+                "snn_s" : torch.cat(new_spikes, dim=1)
             }
 
             decays = torch.sigmoid(self.decays_raw)
-            thresholds = (
-                torch.relu(self.thresholds_raw) + 0.1
-            )
+            thresholds = (torch.relu(self.thresholds_raw) + 0.1)
 
-            self.last_decay_mean = decays.mean().item()
-            self.last_decay_std = decays.std().item()
-
-            self.last_threshold_mean = thresholds.mean().item()
-            self.last_threshold_std = thresholds.std().item()
-
-        self.last_layer_spikes = new_spikes
+            if not torch.jit.is_scripting():
+                self.last_decay_mean = decays.mean().item()
+                self.last_decay_std = decays.std().item()
+                self.last_threshold_mean = thresholds.mean().item()
+                self.last_threshold_std = thresholds.std().item()
+                self.last_layer_spikes = new_spikes
 
         out = self.output_layer(new_mems[-1])    
 
