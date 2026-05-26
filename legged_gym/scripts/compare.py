@@ -187,7 +187,11 @@ def main():
 
         "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/1500_plane/benchmark",
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/all/benchmark"
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/all/benchmark",
+
+        '/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/symmetry_only/benchmark',
+
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/energy_coeff_0.2/benchmark"
 
 
 
@@ -200,7 +204,9 @@ def main():
         "spike_loss (0.1)",
         "spike_loss (0.5)",
         "baseline",
-        "all"
+        "all",
+        'symmetry',
+        "ene 0.2"
 
     ]
 

@@ -90,13 +90,22 @@ class LeggedRobotCfg(BaseConfig):
         thickness = 0.01
 
     class domain_rand:
+        rand_interval_s = 4
         randomize_friction = True
-        friction_range = [0.5, 1.25]
-        randomize_base_mass = False
-        added_mass_range = [-1., 1.]
+        friction_range = [0.2, 1.25]
+        randomize_base_mass = True
+        added_mass_range = [-1., 3.]
         push_robots = True
         push_interval_s = 15
         max_push_vel_xy = 1.
+        randomize_com_displacement = True
+        com_displacement_range = [-0.05, 0.05]
+        randomize_motor_strength = True
+        motor_strength_range = [0.9, 1.1]
+        randomize_Kp_factor = True
+        Kp_factor_range = [0.9, 1.1]
+        randomize_Kd_factor = True
+        Kd_factor_range = [0.9, 1.1]
 
     class rewards:
         class scales:
@@ -202,7 +211,7 @@ class LeggedRobotCfgPPO(BaseConfig):
         policy_class_name = 'ActorCritic'
         algorithm_class_name = 'PPO'
         num_steps_per_env = 24 # per iteration
-        max_iterations = 1500 # number of policy updates
+        max_iterations = 3000 # number of policy updates
 
         # logging
         save_interval = 50 # check for potential saves every this many iterations
