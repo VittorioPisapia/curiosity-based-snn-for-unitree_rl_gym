@@ -9,13 +9,13 @@ simulation_dt: 0.002
 # Controller update frequency (meets the requirement of simulation_dt * controll_decimation=0.02; 50Hz)
 control_decimation: 10
 
-kps: [20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20, 20]
+kps: [12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12, 12]
 kds: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5]
 
-default_angles: [ 0.1,  0.8, -1.5,   # FL (Anca, Coscia, Polpaccio)
-                 -0.1,  0.8, -1.5,   # FR
+default_angles: [ 0.1,  0.8, -1.5,   # FL 
+                  0.1,  0.8, -1.5,   # FR
                   0.1,  1.0, -1.5,   # RL
-                 -0.1,  1.0, -1.5 ]  # RR
+                  0.1,  1.0, -1.5 ]  # RR
 
 ang_vel_scale: 0.25
 dof_pos_scale: 1.0

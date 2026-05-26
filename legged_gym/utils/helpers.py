@@ -192,13 +192,8 @@ def export_policy_as_jit(actor_critic, path):
         os.makedirs(path, exist_ok=True)
         path = os.path.join(path, 'policy_1.pt')
         model = copy.deepcopy(actor_critic.actor).to('cpu')
-<<<<<<< HEAD
-        #traced_script_module = torch.jit.script(model)
-        #traced_script_module.save(path)
-=======
         traced_script_module = torch.jit.script(model) 
         traced_script_module.save(path)
->>>>>>> 87419535239ab58fd5994cd86a27338fbe618151
 
 
 class PolicyExporterLSTM(torch.nn.Module):
@@ -226,8 +221,8 @@ class PolicyExporterLSTM(torch.nn.Module):
         os.makedirs(path, exist_ok=True)
         path = os.path.join(path, 'policy_lstm_1.pt')
         self.to('cpu')
-        #traced_script_module = torch.jit.script(self)
-        #traced_script_module.save(path)
+        traced_script_module = torch.jit.script(self)
+        traced_script_module.save(path)
 
 
 class PolicyExporterSNN(torch.nn.Module):
@@ -268,7 +263,6 @@ class PolicyExporterSNN(torch.nn.Module):
         export_path = os.path.join(path, 'policy_snn_1.pt')
         self.to('cpu')
         
-        # Adesso il JIT funzionerà senza problemi
         traced_script_module = torch.jit.script(self) 
         traced_script_module.save(export_path)
     
