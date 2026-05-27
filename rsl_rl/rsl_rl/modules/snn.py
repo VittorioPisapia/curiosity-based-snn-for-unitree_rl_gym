@@ -284,7 +284,7 @@ class SNN(nn.Module):
 
         self.output_layer = nn.Linear(num_neurons[-1], output_dim)
 
-        slope=25
+        slope=10
 
         # ---- Neuron model ----
         if neuron_type == "Gaussian":
@@ -301,10 +301,10 @@ class SNN(nn.Module):
 
         # ---- Decyas and thresholds ----
         self.thresholds_raw = nn.Parameter(
-            torch.full((self.total_neurons,), threshold_init, device=self.device) 
+            torch.full((self.total_neurons,), threshold_init, dtype=torch.float32, device=self.device) 
         )
         self.decays_raw = nn.Parameter(
-            torch.full((self.total_neurons,), 2, device=self.device) #-0.5
+            torch.full((self.total_neurons,), -0.5, dtype=torch.float32, device=self.device) #-0.5
         )
 
         # ---- Logging ----

@@ -221,15 +221,13 @@ class PPO_Rnd (PPO):
                 if self.use_spike_loss:
                     spike_rates = self.actor_critic.actor.last_layer_spikes
 
-                    spike_loss = 0.0
-
-                    for l, s in enumerate(spike_rates):
-                        rate = s.mean()
-                        spike_loss += (rate - self.target_rates[l]) ** 2
-
-                    spike_loss /= len(spike_rates)
-                    
-                    loss = loss + spike_loss * self.spike_loss_coeff
+                    # Only look at the first layer (index 0)
+                    if len(spike_rates) > 0:
+                        rate = spike_rates[0].mean()
+                        spike_loss = (rate - self.target_rates[0]) ** 2
+                        
+                        # Apply the coefficient directly to the single-layer loss
+                        loss = loss + spike_loss * self.spike_loss_coeff
 
                 # Gradient step
                 self.optimizer.zero_grad()

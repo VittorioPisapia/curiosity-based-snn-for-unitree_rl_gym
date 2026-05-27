@@ -8,7 +8,7 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
             snn_threshold = 0.4 # 0.5
             snn_lens = 0.3 # 0.3 Gaussian width
             snn_st = 1  # 1
-            neuron_type = "Gaussian" # Gaussian, BPTT
+            neuron_type = "Gaussian" # Gaussian, BPTT, FastSigmoid
             num_neurons = [384, 384] # 256, 384, 512
 
     class runner ( GO2RoughCfgPPO.runner ):
@@ -19,7 +19,7 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
     class algorithm ( GO2RoughCfgPPO.algorithm):
         use_symmetry = True
 
-        use_spike_loss = False
+        use_spike_loss = True
         spike_loss_coeff = 0.05
         spike_rate_target = [0.10, 0.10]
 
