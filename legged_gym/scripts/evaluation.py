@@ -12,8 +12,8 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.utils import task_registry, get_args, set_seed, get_load_path
 from legged_gym.utils.play_logger import RobotLogger
 
-VELOCITIES = [0.5, 0.75, 1, 1.25, 1.50]
-SEEDS = [0,1,2,3,4,5,6,7,8,9,10]
+VELOCITIES = [0.5, 0.75, 1, 1.20, 1.30]
+SEEDS = [0,1,2,3,4,5]
 
 EPISODE_STEPS = 600 
 

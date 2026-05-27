@@ -137,7 +137,100 @@ class SpikeFunctionBPTT(torch.autograd.Function):
         gamma = ctx.gamma
         zeros = torch.zeros_like(v_scaled, device=v_scaled.device)
         return torch.maximum(1 - torch.abs(v_scaled), zeros) * gamma * grad_output, None
+    
 
+class SpikeFunctionFastSigmoid(torch.autograd.Function):
+
+    @staticmethod
+    def forward(ctx, membrane, threshold, slope):
+        ctx.save_for_backward(membrane, threshold)
+        ctx.slope = slope
+
+        return (membrane > threshold).float()
+
+    @staticmethod
+    def backward(ctx, grad_output):
+
+        membrane, threshold = ctx.saved_tensors
+        slope = ctx.slope
+
+        x = membrane - threshold
+
+        grad = 1.0 / (1.0 + slope * torch.abs(x))**2
+
+        return grad_output * grad, -grad_output * grad, None
+
+class LIFFastSigmoid(Neurons):
+
+    def __init__(
+            self,
+            slope: float,
+            device: Union[str, torch.device],
+            **kwargs,
+        ) -> None:
+
+        super().__init__(
+            ["snn_s", "snn_m"],
+            SpikeFunctionFastSigmoid,
+            device
+        )
+
+        self.slope = slope
+
+    def forward(
+            self,
+            x: torch.Tensor,
+            thresholds: torch.Tensor,
+            decays: torch.Tensor,
+            hidden_states: Dict[str, torch.Tensor],
+            spiking_neurons: bool
+        ) -> Dict[str, torch.Tensor]:
+
+        batch_sz = x.shape[0]
+        layer_sz = x.shape[1]
+
+        self._set_hidden_states(
+            hidden_states,
+            [batch_sz, layer_sz]
+        )
+
+        spikes_reset = 1.0
+
+        if spiking_neurons:
+            spikes_reset = (
+                1.0 - self.hidden_states_tensors["snn_s"]
+            )
+
+        snn_m_out = (
+            self.hidden_states_tensors["snn_m"]
+            * decays
+            * spikes_reset
+            + x
+        )
+
+        if spiking_neurons:
+
+            if torch.jit.is_scripting():
+                snn_s_out = (
+                    snn_m_out > thresholds
+                ).float()
+
+            else:
+                snn_s_out = self.spike_function(
+                    snn_m_out,
+                    thresholds,
+                    self.slope
+                )
+
+        else:
+            snn_s_out = torch.zeros_like(snn_m_out)
+
+        output: Dict[str, torch.Tensor] = {
+            "snn_m": snn_m_out,
+            "snn_s": snn_s_out
+        }
+
+        return output
 
 class LIF_BPTT(Neurons):
     def __init__(
@@ -191,11 +284,15 @@ class SNN(nn.Module):
 
         self.output_layer = nn.Linear(num_neurons[-1], output_dim)
 
+        slope=25
+
         # ---- Neuron model ----
         if neuron_type == "Gaussian":
             self.fs = LIFGaussian(lens=lens, device=self.device)
         elif neuron_type == "BPTT":
             self.fs = LIF_BPTT(device=self.device)
+        elif neuron_type == "FastSigmoid":
+            self.fs = LIFFastSigmoid(slope=slope,device=self.device)
         else:
             raise ValueError(f"Unsupported neuron type: {neuron_type}")
 
@@ -207,7 +304,7 @@ class SNN(nn.Module):
             torch.full((self.total_neurons,), threshold_init, device=self.device) 
         )
         self.decays_raw = nn.Parameter(
-            torch.full((self.total_neurons,), -0.5, device=self.device) #-0.5
+            torch.full((self.total_neurons,), 2, device=self.device) #-0.5
         )
 
         # ---- Logging ----

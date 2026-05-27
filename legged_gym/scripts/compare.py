@@ -177,21 +177,10 @@ def main():
 
     benchmark_dirs = [
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/May22_15-29-01_/benchmark",
-
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_1500_plane/benchmark",
-
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/spike_0.1_0.01/benchmark",
-
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/1500_spike_0.5/benchmark",
-
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/1500_plane/benchmark",
-
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/all/benchmark",
-
-        '/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/symmetry_only/benchmark',
-
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/energy_coeff_0.2/benchmark"
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/baseline_plane/benchmark",
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_snn/benchmark",
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00013/benchmark",
+        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_energy/energy_baseline_0.2/benchmark",
 
 
 
@@ -199,14 +188,10 @@ def main():
     ]
 
     labels = [
-        "energy_loss",
-        "baseline_snn",
-        "spike_loss (0.1)",
-        "spike_loss (0.5)",
-        "baseline",
-        "all",
-        'symmetry',
-        "ene 0.2"
+        "pure PPO",
+        "snn",
+        "rnd (0.00013)",
+        "energy (0.2)",
 
     ]
 
