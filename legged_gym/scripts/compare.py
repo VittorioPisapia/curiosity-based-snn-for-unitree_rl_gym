@@ -179,32 +179,45 @@ def main():
 
         #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/baseline_plane/benchmark",
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_snn/benchmark",
+        #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_snn/benchmark",
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00013/benchmark",
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00015/benchmark",
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00017/benchmark",
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00019/benchmark",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00013/benchmark",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00015/benchmark",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00017/benchmark",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00019/benchmark",
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_0.10/benchmark",
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_0.00015/benchmark",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_0.10/benchmark",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_0.00015/benchmark",
 
         "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_symm/benchmark",
         "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm/benchmark",
+
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/baseline_rough/benchmark",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/slopes_spike_symm/benchmark_small",
+        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_slopes_spike_symm/benchmark_small",
+ 
     ]
 
     labels = [
-        #"PPO",
-        "SNN",
-        "RND (0.00013)",
-        "RND (0.00015)",
-        "RND (0.00017)",
-        "RND (0.00019)",
-        "SPIKE (0.10)",
-        "RND SPIKE (0.10)",
+        # "PPO",
+
+        # "SNN",
+
+        # "RND (0.00013)",
+        # "RND (0.00015)",
+        # "RND (0.00017)",
+        # "RND (0.00019)",
+
+        # "SPIKE (0.10)",
+        # "RND SPIKE (0.10)",
 
         "SNN SPIKE SYMM",
-        "RND SPIKE SYMM"
+        "RND SPIKE SYMM",
+
+        # "SLOPE PPO",
+        # "SLOPE SNN",
+        # "SLOPE RND"
+
 
     ]
 

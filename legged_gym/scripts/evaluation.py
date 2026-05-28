@@ -12,8 +12,11 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.utils import task_registry, get_args, set_seed, get_load_path
 from legged_gym.utils.play_logger import RobotLogger
 
+# VELOCITIES = [0.5, 0.75, 1, 1.2, 1.3]
+#SEEDS = [0,1,2,3,4,5]
+
 VELOCITIES = [0.5, 0.75, 1, 1.2, 1.3]
-SEEDS = [0,1,2,3,4,5]
+SEEDS = [0]
 
 EPISODE_STEPS = 600 
 
@@ -85,6 +88,16 @@ def run_episode(env, policy, speed, seed, env_cfg, save_dir=None, record_video=T
     env.commands[:, 0] = speed  # Velocità X desiderata
     env.commands[:, 1] = 0.0    # Velocità Y a zero
     env.commands[:, 2] = 0.0    # Yaw a zero
+
+    env_cfg.terrain.num_rows = 3
+    env_cfg.terrain.num_cols = 3
+    env_cfg.terrain.max_init_terrain_level = 6
+    env_cfg.terrain.curriculum = False
+    env_cfg.noise.add_noise = False
+    env_cfg.domain_rand.randomize_friction = False
+    env_cfg.domain_rand.push_robots = False
+    env_cfg.domain_rand.push_interval_s=5
+    env_cfg.domain_rand.max_push_vel_xy=1
     
     # 3. Disabilita il resampling direttamente nell'istanza dell'ambiente
     if hasattr(env, 'command_substeps'):
