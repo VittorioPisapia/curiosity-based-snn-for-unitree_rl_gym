@@ -2,6 +2,72 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
+import os
+import numpy as np
+import pandas as pd
+
+
+def create_reference_velocity_table(
+    benchmark_dirs,
+    labels,
+    reference_velocity=1.0
+):
+
+    aggregations = []
+
+    for path in benchmark_dirs:
+
+        agg_path = os.path.join(path, "aggregated.npy")
+
+        agg = np.load(
+            agg_path,
+            allow_pickle=True
+        ).item()
+
+        aggregations.append(agg)
+
+    # ---------------------------
+    # Find velocity index
+    # ---------------------------
+
+    vels = aggregations[0]["vel"]
+
+    idx = np.argmin(np.abs(vels - reference_velocity))
+
+    selected_vel = vels[idx]
+
+    # ---------------------------
+    # Baseline
+    # ---------------------------
+
+    baseline_cot = aggregations[0]["cot_mean"][idx]
+    baseline_rmse = aggregations[0]["rmse_mean"][idx]
+
+    rows = []
+
+    for label, agg in zip(labels, aggregations):
+
+        cot = agg["cot_mean"][idx]
+        cot_std = agg["cot_std"][idx]
+
+        rmse = agg["rmse_mean"][idx]
+        rmse_std = agg["rmse_std"][idx]
+
+        delta_cot = 100.0 * (cot - baseline_cot) / baseline_cot
+        delta_rmse = 100.0 * (rmse - baseline_rmse) / baseline_rmse
+
+        rows.append({
+            "Model": label,
+            "CoT": f"{cot:.3f} ± {cot_std:.3f}",
+            "RMSE": f"{rmse:.3f} ± {rmse_std:.3f}",
+            "ΔCoT (%)": f"{delta_cot:+.1f}",
+            "ΔRMSE (%)": f"{delta_rmse:+.1f}"
+        })
+
+    df = pd.DataFrame(rows)
+
+
+    return df
 
 def compare_benchmarks(
     benchmark_dirs,
@@ -59,7 +125,7 @@ def compare_benchmarks(
     # CoT comparison
     # =========================================================
 
-    plt.figure(figsize=(7, 5))
+    plt.figure(figsize=(10, 5))
 
     for agg, label, color in zip(aggregations, labels, colors):
 
@@ -93,7 +159,7 @@ def compare_benchmarks(
     # RMSE comparison
     # =========================================================
 
-    plt.figure(figsize=(7, 5))
+    plt.figure(figsize=(10, 5))
 
     for agg, label, color in zip(aggregations, labels, colors):
 
@@ -126,13 +192,13 @@ def compare_benchmarks(
     # Pareto plot
     # =========================================================
 
-    plt.figure(figsize=(8, 6))
+    plt.figure(figsize=(10, 6))
 
     for agg, label, color in zip(aggregations, labels, colors):
 
         plt.plot(
-            agg["rmse_mean"],
-            agg["cot_mean"],
+            agg["rmse_mean"][:-1],
+            agg["cot_mean"][:-1],
             marker="o",
             linewidth=2,
             color=color,
@@ -140,7 +206,7 @@ def compare_benchmarks(
         )
 
         # velocity annotations
-        for i, v in enumerate(agg["vel"]):
+        for i, v in enumerate(agg["vel"][:-1]):
 
             plt.annotate(
                 f"{v:.2f}",
@@ -182,15 +248,15 @@ def main():
         #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_snn/benchmark",
 
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00013/benchmark",
-        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00015/benchmark",
+        #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00015/benchmark",
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00017/benchmark",
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00019/benchmark",
 
         #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_0.10/benchmark",
-         #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_0.00015/benchmark",
+        #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_0.00015/benchmark",
 
         #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_symm/benchmark",
-        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm/benchmark",
+        #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm/benchmark",
 
         #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/baseline_rough/benchmark",
         "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/slopes_spike_symm/benchmark_small",
@@ -204,22 +270,30 @@ def main():
         #"SNN",
 
         # "RND (0.00013)",
-        # "RND (0.00015)",
+        #"RND ",
         # "RND (0.00017)",
         # "RND (0.00019)",
 
         #"SPIKE (0.10)",
-        # "RND SPIKE (0.10)",
+        #"RND SPIKE (0.10)",
 
         #"SNN SPIKE SYMM",
         #"RND SPIKE SYMM",
 
         #"SLOPE PPO",
-        "SLOPE SNN",
-        "SLOPE RND"
+        "SNN SPIKE SYMM",
+        "RND SPIKE SYMM",
 
 
     ]
+
+    df = create_reference_velocity_table(
+    benchmark_dirs,
+    labels,
+    reference_velocity=1.0
+    )
+
+    print(df)
 
     compare_benchmarks(
         benchmark_dirs,
