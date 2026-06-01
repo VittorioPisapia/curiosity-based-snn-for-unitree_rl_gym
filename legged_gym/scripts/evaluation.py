@@ -12,31 +12,34 @@ from legged_gym import LEGGED_GYM_ROOT_DIR
 from legged_gym.utils import task_registry, get_args, set_seed, get_load_path
 from legged_gym.utils.play_logger import RobotLogger
 
-# VELOCITIES = [0.5, 0.75, 1, 1.2, 1.3]
-#SEEDS = [0,1,2,3,4,5]
-
 VELOCITIES = [0.5, 0.75, 1, 1.2, 1.3]
-SEEDS = [0]
+SEEDS = [0,1,2,3,4,5]
+
+#VELOCITIES = [0.5, 0.75, 1, 1.2, 1.3]
+#SEEDS = [0]
 
 EPISODE_STEPS = 600 
+
+def safe_corr(a, b):
+    if np.std(a) < 1e-8 or np.std(b) < 1e-8:
+        return np.nan
+    return np.corrcoef(a, b)[0, 1]
 
 def compute_metrics(logger, env):
     """
     Returns:
-        dict with CoT, tracking error, etc.
+        dict containing:
+            - tracking metrics
+            - CoT metrics
+            - gait metrics
     """
 
-    # =========================
-    # Global temporal mask
-    # =========================
+    # ==================================================
+    # Remove transient
+    # ==================================================
 
     time_axis = np.arange(logger.num_steps) * env.dt
-
     mask = time_axis >= 3.0
-
-    # =========================
-    # Apply mask to all signals
-    # =========================
 
     cmd = np.array(logger.cmd_vel_x)[mask]
     act = np.array(logger.act_vel_x)[mask]
@@ -45,26 +48,184 @@ def compute_metrics(logger, env):
 
     contacts = np.array(logger.contacts)[mask]
 
-    # =========================
-    # Metrics
-    # =========================
+    # ==================================================
+    # Tracking metrics
+    # ==================================================
 
     vel_err = np.abs(cmd - act)
 
     rmse = np.sqrt(np.mean((cmd - act) ** 2))
     mae = np.mean(vel_err)
 
+    # ==================================================
+    # CoT metrics
+    # ==================================================
+
     cot_mean = np.mean(cot)
     cot_std = np.std(cot)
 
+    # ==================================================
+    # Contact metrics
+    # ==================================================
+
     contact_variance = np.var(contacts)
 
+    # ==================================================
+    # Contacts
+    #
+    # 0 -> FL
+    # 1 -> FR
+    # 2 -> RL
+    # 3 -> RR
+    # ==================================================
+
+    FL = contacts[:, 0].astype(float)
+    FR = contacts[:, 1].astype(float)
+    RL = contacts[:, 2].astype(float)
+    RR = contacts[:, 3].astype(float)
+
+    # ==================================================
+    # Duty Factor
+    # ==================================================
+
+    df_fl = np.mean(FL)
+    df_fr = np.mean(FR)
+    df_rl = np.mean(RL)
+    df_rr = np.mean(RR)
+
+    duty_factor = np.mean([
+        df_fl,
+        df_fr,
+        df_rl,
+        df_rr
+    ])
+
+    # ==================================================
+    # Stance Symmetry
+    # ==================================================
+
+    sym_front = abs(df_fl - df_fr)
+    sym_rear = abs(df_rl - df_rr)
+
+    stance_symmetry = 0.5 * (
+        sym_front +
+        sym_rear
+    )
+
+    # ==================================================
+    # Left / Right Balance
+    # ==================================================
+
+    left_stance = FL.sum() + RL.sum()
+    right_stance = FR.sum() + RR.sum()
+
+    lr_balance = (
+        left_stance /
+        (right_stance + 1e-8)
+    )
+
+    # ==================================================
+    # Diagonal Synchronization
+    #
+    # trot:
+    # FL <-> RR
+    # FR <-> RL
+    # ==================================================
+
+    diag_corr_1 = safe_corr(FL, RR)
+    diag_corr_2 = safe_corr(FR, RL)
+
+    diag_sync = np.nanmean([
+        diag_corr_1,
+        diag_corr_2
+    ])
+
+    # ==================================================
+    # Lateral Synchronization
+    #
+    # pace detector
+    # ==================================================
+
+    lat_corr_1 = safe_corr(FL, FR)
+    lat_corr_2 = safe_corr(RL, RR)
+
+    lat_sync = np.nanmean([
+        lat_corr_1,
+        lat_corr_2
+    ])
+
+    # ==================================================
+    # Support legs
+    # ==================================================
+
+    support_legs = contacts.sum(axis=1)
+
+    mean_support = np.mean(support_legs)
+    std_support = np.std(support_legs)
+
+    # ==================================================
+    # Contact switching frequency
+    # ==================================================
+
+    switches = []
+
+    for foot in [FL, FR, RL, RR]:
+
+        transitions = np.sum(
+            np.abs(np.diff(foot))
+        )
+
+        switches.append(
+            transitions /
+            len(foot)
+        )
+
+    switch_frequency = np.mean(switches)
+
     return {
+
+        # Tracking
         "rmse": rmse,
         "mae": mae,
+
+        # CoT
         "cot": cot_mean,
         "cot_std": cot_std,
-        "contact_var": contact_variance
+
+        # Generic contacts
+        "contact_var": contact_variance,
+
+        # Duty factor
+        "df_fl": df_fl,
+        "df_fr": df_fr,
+        "df_rl": df_rl,
+        "df_rr": df_rr,
+        "duty_factor": duty_factor,
+
+        # Symmetry
+        "sym_front": sym_front,
+        "sym_rear": sym_rear,
+        "stance_symmetry": stance_symmetry,
+
+        # Left-right balance
+        "lr_balance": lr_balance,
+
+        # Diagonal synchronization
+        "diag_corr_1": diag_corr_1,
+        "diag_corr_2": diag_corr_2,
+        "diag_sync": diag_sync,
+
+        # Lateral synchronization
+        "lat_corr_1": lat_corr_1,
+        "lat_corr_2": lat_corr_2,
+        "lat_sync": lat_sync,
+
+        # Support
+        "mean_support": mean_support,
+        "std_support": std_support,
+
+        # Switching
+        "switch_frequency": switch_frequency,
     }
 
 
@@ -160,8 +321,28 @@ def run_benchmark(env, policy, env_cfg, out_dir):
 
             metrics = compute_metrics(logger, env)
 
+            # stesso preprocessing usato per le metriche
+            time_axis = np.arange(logger.num_steps) * env.dt
+            mask = time_axis >= 3.0
+
+            contacts = np.array(
+                logger.contacts,
+                dtype=np.uint8
+            )
+
+            contacts = contacts[mask]
+
+            # formato identico a plot_gait()
+            metrics["binary_pattern"] = contacts.T
+            
+            np.save(
+                os.path.join(run_dir, "binary_pattern.npy"),
+                contacts.T.astype(np.uint8)
+            )
             with open(os.path.join(run_dir, "metrics.txt"), "w") as f:
-                f.write(str(metrics))
+                tmp = metrics.copy()
+                tmp.pop("binary_pattern")
+                f.write(str(tmp))
 
             results[v][seed] = metrics
 
@@ -170,13 +351,31 @@ def run_benchmark(env, policy, env_cfg, out_dir):
 def aggregate(results):
 
     vel_list = []
-    cot_mean, cot_std = [], []
-    rmse_mean, rmse_std = [], []
+
+    cot_mean = []
+    cot_std = []
+
+    rmse_mean = []
+    rmse_std = []
+
+    duty_factor_mean = []
+    diag_sync_mean = []
+    stance_symmetry_mean = []
+    support_mean = []
+    lr_balance_mean = []
+    switch_mean = []
 
     for v, seed_dict in results.items():
 
         cots = [seed_dict[s]["cot"] for s in seed_dict]
         rmses = [seed_dict[s]["rmse"] for s in seed_dict]
+
+        dfs = [seed_dict[s]["duty_factor"] for s in seed_dict]
+        diags = [seed_dict[s]["diag_sync"] for s in seed_dict]
+        syms = [seed_dict[s]["stance_symmetry"] for s in seed_dict]
+        supports = [seed_dict[s]["mean_support"] for s in seed_dict]
+        balances = [seed_dict[s]["lr_balance"] for s in seed_dict]
+        switches = [seed_dict[s]["switch_frequency"] for s in seed_dict]
 
         vel_list.append(v)
 
@@ -186,12 +385,29 @@ def aggregate(results):
         rmse_mean.append(np.mean(rmses))
         rmse_std.append(np.std(rmses))
 
+        duty_factor_mean.append(np.mean(dfs))
+        diag_sync_mean.append(np.mean(diags))
+        stance_symmetry_mean.append(np.mean(syms))
+        support_mean.append(np.mean(supports))
+        lr_balance_mean.append(np.mean(balances))
+        switch_mean.append(np.mean(switches))
+
     return {
+
         "vel": np.array(vel_list),
+
         "cot_mean": np.array(cot_mean),
         "cot_std": np.array(cot_std),
+
         "rmse_mean": np.array(rmse_mean),
         "rmse_std": np.array(rmse_std),
+
+        "duty_factor": np.array(duty_factor_mean),
+        "diag_sync": np.array(diag_sync_mean),
+        "stance_symmetry": np.array(stance_symmetry_mean),
+        "mean_support": np.array(support_mean),
+        "lr_balance": np.array(lr_balance_mean),
+        "switch_frequency": np.array(switch_mean),
     }
 
 
@@ -227,6 +443,66 @@ def plot_results(agg, out_dir):
     plt.title("Tracking Error vs Velocity")
     plt.grid()
     plt.savefig(os.path.join(out_dir, "tracking_curve.png"), dpi=300)
+    
+    # Duty Factor
+    plt.figure()
+    plt.plot(
+        agg["vel"],
+        agg["duty_factor"],
+        marker="o"
+    )
+    plt.xlabel("Velocity (m/s)")
+    plt.ylabel("Duty Factor")
+    plt.grid()
+    plt.savefig(
+        os.path.join(out_dir, "duty_factor.png"),
+        dpi=300
+    )
+
+    # Diagonal Sync
+    plt.figure()
+    plt.plot(
+        agg["vel"],
+        agg["diag_sync"],
+        marker="o"
+    )
+    plt.xlabel("Velocity (m/s)")
+    plt.ylabel("Diagonal Synchronization")
+    plt.grid()
+    plt.savefig(
+        os.path.join(out_dir, "diag_sync.png"),
+        dpi=300
+    )
+
+    # Support Legs
+    plt.figure()
+    plt.plot(
+        agg["vel"],
+        agg["mean_support"],
+        marker="o"
+    )
+    plt.xlabel("Velocity (m/s)")
+    plt.ylabel("Mean Supporting Legs")
+    plt.grid()
+    plt.savefig(
+        os.path.join(out_dir, "support_legs.png"),
+        dpi=300
+    )
+
+    # Stance Symmetry
+    plt.figure()
+    plt.plot(
+        agg["vel"],
+        agg["stance_symmetry"],
+        marker="o"
+    )
+    plt.xlabel("Velocity (m/s)")
+    plt.ylabel("Stance Symmetry")
+    plt.grid()
+    plt.savefig(
+        os.path.join(out_dir, "stance_symmetry.png"),
+        dpi=300
+    )
 
     plt.show()
 
