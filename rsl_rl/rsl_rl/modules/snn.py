@@ -14,7 +14,6 @@ import torch.nn as nn
 from abc import abstractmethod
 
 class Neurons(nn.Module):
-    # Type hinting a livello di classe (fondamentale per TorchScript)
     hidden_states_names: List[str]
     hidden_states_tensors: Dict[str, torch.Tensor]
 
@@ -30,10 +29,7 @@ class Neurons(nn.Module):
         self.spike_function = grad.apply if grad is not None else None
         
         self.hidden_states_names = hidden_states_names
-        
-        # IL TRUCCO PER TORCHSCRIPT: 
-        # Inizializziamo il dizionario con tensori dummy (dimensione 0).
-        # In questo modo, il JIT vede che ci sono stringhe come chiavi e Tensori come valori!
+
         self.hidden_states_tensors = {
             name: torch.empty(0, device=self.device) for name in self.hidden_states_names
         }
@@ -72,11 +68,9 @@ class SpikeFunctionGaussian(torch.autograd.Function):
         exp = torch.exp(-(v_membrane - thresh)**2 / (2 * lens))
         temp = (exp / math.sqrt(2 * math.pi * lens)).float()
         
-        # Calculate gradients
         grad_v_membrane = grad_output_clone * temp
-        grad_thresh = -grad_v_membrane # The chain rule gives us a negative sign here
-        
-        # Return gradients for (v_membrane, thresh, lens)
+        grad_thresh = -grad_v_membrane 
+
         return grad_v_membrane, grad_thresh, None
 
 class LIFGaussian(Neurons):
@@ -101,10 +95,8 @@ class LIFGaussian(Neurons):
         if spiking_neurons:
             spikes_reset = 1.0 - self.hidden_states_tensors["snn_s"]
         
-        # Calcoliamo prima la membrana
         snn_m_out = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
         
-        # Calcoliamo gli spike
         if spiking_neurons:
             if torch.jit.is_scripting():
                 snn_s_out = snn_m_out.gt(thresholds).float()
@@ -113,8 +105,6 @@ class LIFGaussian(Neurons):
         else:
             snn_s_out = torch.zeros_like(snn_m_out)
                 
-        # Creiamo il dizionario GIA' POPOLATO in un'unica istruzione
-        # Questo previene qualsiasi errore "Dictionary inputs must have entries"
         output: Dict[str, torch.Tensor] = {
             "snn_m": snn_m_out,
             "snn_s": snn_s_out
@@ -224,13 +214,11 @@ class SNN(nn.Module):
 
     def _neurons_forward(self, x: torch.Tensor, hidden_states: Dict[str, torch.Tensor], start_idx: int, end_idx: int, output_spikes: bool = True) -> Dict[str, torch.Tensor]:
         
-        # Dizionario inizializzato in modo JIT-safe
         local_states = torch.jit.annotate(Dict[str, torch.Tensor], {})
 
         for hname in self.fs.hidden_states_names:
             if hname in hidden_states:
                 local_states[hname] = hidden_states[hname][:, start_idx:end_idx].clone()
-            # Se manca, LIFGaussian provvederà a creare gli zero tensor internamente
 
         decays = torch.sigmoid(self.decays_raw[start_idx:end_idx])
         # thresholds = torch.sigmoid(self.thresholds_raw[start_idx:end_idx])
@@ -262,7 +250,6 @@ class SNN(nn.Module):
                 "snn_s": hidden_states["snn_s"].clone(),
             }
 
-        # 1. DICHIARAZIONE NELLO SCOPE ESTERNO (Risolve l'errore 'undefined value')
         new_mems: List[torch.Tensor] = []
         new_spikes: List[torch.Tensor] = []
 
@@ -270,7 +257,6 @@ class SNN(nn.Module):
 
             x = obs
             
-            # 2. RE-INIZIALIZZAZIONE AD OGNI STEP TEMPORALE (Se st > 1)
             new_mems = torch.jit.annotate(List[torch.Tensor], [])
             new_spikes = torch.jit.annotate(List[torch.Tensor], [])
             start_idx = 0

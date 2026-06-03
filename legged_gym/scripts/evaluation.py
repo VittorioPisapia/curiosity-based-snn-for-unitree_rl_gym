@@ -34,10 +34,6 @@ def compute_metrics(logger, env):
             - gait metrics
     """
 
-    # ==================================================
-    # Remove transient
-    # ==================================================
-
     time_axis = np.arange(logger.num_steps) * env.dt
     mask = time_axis >= 3.0
 
@@ -48,45 +44,20 @@ def compute_metrics(logger, env):
 
     contacts = np.array(logger.contacts)[mask]
 
-    # ==================================================
-    # Tracking metrics
-    # ==================================================
-
     vel_err = np.abs(cmd - act)
 
     rmse = np.sqrt(np.mean((cmd - act) ** 2))
     mae = np.mean(vel_err)
 
-    # ==================================================
-    # CoT metrics
-    # ==================================================
-
     cot_mean = np.mean(cot)
     cot_std = np.std(cot)
 
-    # ==================================================
-    # Contact metrics
-    # ==================================================
-
     contact_variance = np.var(contacts)
-
-    # ==================================================
-    # Contacts
-    #
-    # 0 -> FL
-    # 1 -> FR
-    # 2 -> RL
-    # 3 -> RR
-    # ==================================================
 
     FL = contacts[:, 0].astype(float)
     FR = contacts[:, 1].astype(float)
     RL = contacts[:, 2].astype(float)
     RR = contacts[:, 3].astype(float)
-
-    # ==================================================
-    # Duty Factor
-    # ==================================================
 
     df_fl = np.mean(FL)
     df_fr = np.mean(FR)
@@ -100,10 +71,6 @@ def compute_metrics(logger, env):
         df_rr
     ])
 
-    # ==================================================
-    # Stance Symmetry
-    # ==================================================
-
     sym_front = abs(df_fl - df_fr)
     sym_rear = abs(df_rl - df_rr)
 
@@ -111,10 +78,6 @@ def compute_metrics(logger, env):
         sym_front +
         sym_rear
     )
-
-    # ==================================================
-    # Left / Right Balance
-    # ==================================================
 
     left_stance = FL.sum() + RL.sum()
     right_stance = FR.sum() + RR.sum()
@@ -124,14 +87,6 @@ def compute_metrics(logger, env):
         (right_stance + 1e-8)
     )
 
-    # ==================================================
-    # Diagonal Synchronization
-    #
-    # trot:
-    # FL <-> RR
-    # FR <-> RL
-    # ==================================================
-
     diag_corr_1 = safe_corr(FL, RR)
     diag_corr_2 = safe_corr(FR, RL)
 
@@ -139,12 +94,6 @@ def compute_metrics(logger, env):
         diag_corr_1,
         diag_corr_2
     ])
-
-    # ==================================================
-    # Lateral Synchronization
-    #
-    # pace detector
-    # ==================================================
 
     lat_corr_1 = safe_corr(FL, FR)
     lat_corr_2 = safe_corr(RL, RR)
@@ -154,18 +103,10 @@ def compute_metrics(logger, env):
         lat_corr_2
     ])
 
-    # ==================================================
-    # Support legs
-    # ==================================================
-
     support_legs = contacts.sum(axis=1)
 
     mean_support = np.mean(support_legs)
     std_support = np.std(support_legs)
-
-    # ==================================================
-    # Contact switching frequency
-    # ==================================================
 
     switches = []
 
@@ -232,7 +173,7 @@ def compute_metrics(logger, env):
 def run_episode(env, policy, speed, seed, env_cfg, save_dir=None, record_video=True, make_plot=True):
 
     set_seed(seed)
-    env_cfg.env.test = True # Nota: anche questo andrebbe fatto prima di istanziare l'env nel main, ma non fa danni qui
+    env_cfg.env.test = True 
 
     logger = RobotLogger()
     recorder = None
@@ -241,14 +182,12 @@ def run_episode(env, policy, speed, seed, env_cfg, save_dir=None, record_video=T
         video_path = os.path.join(save_dir, "video.mp4")
         recorder = VideoRecorder(env, video_path)
 
-    # 1. Esegui prima il reset
     env.reset()
 
-    # 2. Imposta i comandi fissi
     env.commands[:] = 0.0
-    env.commands[:, 0] = speed  # Velocità X desiderata
-    env.commands[:, 1] = 0.0    # Velocità Y a zero
-    env.commands[:, 2] = 0.0    # Yaw a zero
+    env.commands[:, 0] = speed  
+    env.commands[:, 1] = 0.0   
+    env.commands[:, 2] = 0.0    
 
     env_cfg.terrain.num_rows = 3
     env_cfg.terrain.num_cols = 3
@@ -260,14 +199,11 @@ def run_episode(env, policy, speed, seed, env_cfg, save_dir=None, record_video=T
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1
     
-    # 3. Disabilita il resampling direttamente nell'istanza dell'ambiente
     if hasattr(env, 'command_substeps'):
-        # In alcune versioni di legged_gym si usa questo per bloccare il resampling
         env.command_substeps = 1000000000000000000
     elif hasattr(env, 'cfg'):
         env.cfg.commands.resampling_time = 100000000000000000
 
-    # 4. Prendi le osservazioni CORRETTE e AGGIORNATE dopo il reset e i comandi
     obs = env.get_observations()
 
     try:
@@ -321,7 +257,6 @@ def run_benchmark(env, policy, env_cfg, out_dir):
 
             metrics = compute_metrics(logger, env)
 
-            # stesso preprocessing usato per le metriche
             time_axis = np.arange(logger.num_steps) * env.dt
             mask = time_axis >= 3.0
 
@@ -332,7 +267,6 @@ def run_benchmark(env, policy, env_cfg, out_dir):
 
             contacts = contacts[mask]
 
-            # formato identico a plot_gait()
             metrics["binary_pattern"] = contacts.T
             
             np.save(

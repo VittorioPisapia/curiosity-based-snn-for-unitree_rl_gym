@@ -3,11 +3,6 @@ import argparse
 import numpy as np
 import matplotlib.pyplot as plt
 
-
-# ==========================================================
-# Loading
-# ==========================================================
-
 def load_aggregate(benchmark_dir):
 
     return np.load(
@@ -96,11 +91,6 @@ def load_binary_pattern(
 
     return np.load(path)
 
-
-# ==========================================================
-# Performance plots
-# ==========================================================
-
 def plot_performance(
     agg1,
     label1,
@@ -113,10 +103,6 @@ def plot_performance(
         2,
         figsize=(12, 5)
     )
-
-    # --------------------------
-    # CoT
-    # --------------------------
 
     axes[0].errorbar(
         agg1["vel"],
@@ -143,10 +129,6 @@ def plot_performance(
     axes[0].set_ylabel("CoT")
     axes[0].grid(True)
     axes[0].legend()
-
-    # --------------------------
-    # RMSE
-    # --------------------------
 
     axes[1].errorbar(
         agg1["vel"],
@@ -190,11 +172,6 @@ def plot_performance(
     fig.tight_layout()
 
     return fig
-
-
-# ==========================================================
-# Gait metrics
-# ==========================================================
 
 def plot_gait_metrics(
     agg1,
@@ -270,11 +247,6 @@ def plot_gait_metrics(
     fig.tight_layout()
 
     return fig
-
-
-# ==========================================================
-# Binary pattern plots
-# ==========================================================
 
 def plot_contact_map(
     pattern,
@@ -381,11 +353,6 @@ def plot_binary_patterns(
 
     return fig
 
-
-# ==========================================================
-# Summary
-# ==========================================================
-
 def print_summary(
     agg1,
     label1,
@@ -437,11 +404,6 @@ def print_summary(
                 f"{label2:15s}: "
                 f"{v2:8.4f}"
             )
-
-
-# ==========================================================
-# Main
-# ==========================================================
 
 def main():
 
@@ -523,4 +485,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-

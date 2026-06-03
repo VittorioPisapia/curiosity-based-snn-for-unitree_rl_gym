@@ -13,25 +13,22 @@ class VideoRecorder:
         width=1280,
         height=720,
         fps=50,
-        camera_offset=(2.0, 2.0, 1.0),
+        camera_offset=(1.0, 1.0, 0.5),
     ):
 
         self.env = env
         self.video_path = video_path
         self.camera_offset = camera_offset
 
-        # Camera properties
         self.camera_props = gymapi.CameraProperties()
         self.camera_props.width = width
         self.camera_props.height = height
 
-        # Create camera
         self.camera_handle = self.env.gym.create_camera_sensor(
             self.env.envs[0],
             self.camera_props
         )
 
-        # Initial camera placement
         camera_position = gymapi.Vec3(4.0, 4.0, 3.0)
         camera_target = gymapi.Vec3(0.0, 0.0, 0.5)
 
@@ -42,7 +39,6 @@ class VideoRecorder:
             camera_target
         )
 
-        # Video writer
         self.video_writer = imageio.get_writer(video_path, fps=fps)
 
         print("Starting video recording...")

@@ -184,11 +184,11 @@ def export_policy_as_jit(actor_critic, path):
         exporter = PolicyExporterLSTM(actor_critic)
         exporter.export(path)
     elif hasattr(actor_critic.actor, 'total_neurons'):
-        # SE RILEVA LA SNN, USA IL NUOVO EXPORTER
+        # IF SNN, new exporter
         exporter = PolicyExporterSNN(actor_critic)
         exporter.export(path)
     else: 
-        # Policy standard (MLP senza memoria)
+        # Policy standard
         os.makedirs(path, exist_ok=True)
         path = os.path.join(path, 'policy_1.pt')
         model = copy.deepcopy(actor_critic.actor).to('cpu')
@@ -228,26 +228,19 @@ class PolicyExporterLSTM(torch.nn.Module):
 class PolicyExporterSNN(torch.nn.Module):
     def __init__(self, actor_critic):
         super().__init__()
-        # Assumiamo che actor_critic.actor sia la tua SNN
         self.actor = copy.deepcopy(actor_critic.actor)
         self.actor.cpu()
         
-        # Registriamo gli stati interni come buffer
-        # Assumiamo batch_size = 1 per l'inferenza sul robot
         self.register_buffer('snn_m', torch.zeros(1, self.actor.total_neurons))
         self.register_buffer('snn_s', torch.zeros(1, self.actor.total_neurons))
 
     def forward(self, x: torch.Tensor) -> torch.Tensor:
-        # Ricostruiamo il dizionario atteso dalla SNN
         hidden_states = {
             "snn_m": self.snn_m,
             "snn_s": self.snn_s
         }
-        
-        # Facciamo lo step della SNN (st=1)
         out, new_states = self.actor(x, hidden_states, 1)
         
-        # Aggiorniamo i buffer per lo step di controllo successivo
         self.snn_m[:] = new_states["snn_m"]
         self.snn_s[:] = new_states["snn_s"]
         

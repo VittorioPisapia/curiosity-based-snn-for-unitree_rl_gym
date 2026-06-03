@@ -24,13 +24,6 @@ class SnnRunner ( OnPolicyRunner ):
         self.device = device
         self.env = env
 
-        #self.use_symmetry = self.alg_cfg["use_symmetry"]
-        #self.symmetry_cfg = self.alg_cfg["symmetry"]
-#
-        #self.use_spike_loss = self.alg_cfg["use_spike_loss"]
-        #self.spike_loss_coeff = self.alg_cfg["spike_loss_coeff"]
-        #self.spike_rate_target = self.alg_cfg["spike_rate_target"]
-
         if self.env.num_privileged_obs is not None:
             num_critic_obs = self.env.num_privileged_obs 
         else:

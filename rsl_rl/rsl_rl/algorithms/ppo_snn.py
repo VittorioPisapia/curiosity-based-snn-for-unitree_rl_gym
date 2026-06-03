@@ -190,28 +190,19 @@ class PPO_Snn (PPO):
                     if self.symmetry_module.use_mirror_loss:
                         loss = loss + self.symmetry_module.mirror_loss_coeff * symmetry_loss
                 
-                # if self.use_spike_loss:
-                #     spike_rates = self.actor_critic.actor.last_layer_spikes
 
-                #     spike_loss = 0.0
-
-                #     for l, s in enumerate(spike_rates):
-                #         rate = s.mean()
-                #         spike_loss += (rate - self.target_rates[l]) ** 2
-
-                #     spike_loss /= len(spike_rates)
-                    
-                #     loss = loss + spike_loss * self.spike_loss_coeff
                 if self.use_spike_loss:
                     spike_rates = self.actor_critic.actor.last_layer_spikes
 
-                    # Only look at the first layer (index 0)
-                    if len(spike_rates) > 0:
-                        rate = spike_rates[0].mean()
-                        spike_loss = (rate - self.target_rates[0]) ** 2
-                        
-                        # Apply the coefficient directly to the single-layer loss
-                        loss = loss + spike_loss * self.spike_loss_coeff
+                    spike_loss = 0.0
+
+                    for l, s in enumerate(spike_rates):
+                        rate = s.mean()
+                        spike_loss += (rate - self.target_rates[l]) ** 2
+
+                    spike_loss /= len(spike_rates)
+                    
+                    loss = loss + spike_loss * self.spike_loss_coeff
                         
                 # Gradient step
                 self.optimizer.zero_grad()
