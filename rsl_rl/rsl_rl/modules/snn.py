@@ -91,10 +91,15 @@ class LIFGaussian(Neurons):
 
         self._set_hidden_states(hidden_states, [batch_sz, layer_sz])
 
-        spikes_reset = 1.0
+        #spikes_reset = 1.0
+        #if spiking_neurons:
+        #    spikes_reset = 1.0 - self.hidden_states_tensors["snn_s"]
+
         if spiking_neurons:
             spikes_reset = 1.0 - self.hidden_states_tensors["snn_s"]
-        
+        else:
+            spikes_reset = torch.ones_like(self.hidden_states_tensors["snn_s"])
+            
         snn_m_out = self.hidden_states_tensors["snn_m"] * decays * spikes_reset + x
         
         if spiking_neurons:
