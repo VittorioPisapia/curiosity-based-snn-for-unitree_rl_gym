@@ -4,6 +4,7 @@ from legged_gym.envs.go2.go2_config import GO2RoughCfg, GO2RoughCfgPPO
 from legged_gym.envs.go2.go2_snn_config import GO2RoughSNNCfgPPO
 from legged_gym.envs.go2.go2_rnd_config import GO2RoughRNDCfgPPO
 from legged_gym.envs.go2.go2_energy_config import GO2RoughEnergyCfgPPO
+from legged_gym.envs.go2.go2_real_config import GO2RoughRealCfg, GO2RoughRealCfgPPO
 from legged_gym.envs.h1.h1_config import H1RoughCfg, H1RoughCfgPPO
 from legged_gym.envs.h1.h1_env import H1Robot
 from legged_gym.envs.h1_2.h1_2_config import H1_2RoughCfg, H1_2RoughCfgPPO
@@ -18,6 +19,7 @@ task_registry.register( "go2", LeggedRobot, GO2RoughCfg(), GO2RoughCfgPPO())
 task_registry.register( "go2_snn", LeggedRobot, GO2RoughCfg(), GO2RoughSNNCfgPPO())
 task_registry.register( "go2_rnd", LeggedRobot, GO2RoughCfg(), GO2RoughRNDCfgPPO())
 task_registry.register( "go2_energy", LeggedRobot, GO2RoughCfg(), GO2RoughEnergyCfgPPO())
+task_registry.register( "go2_real", LeggedRobot, GO2RoughRealCfg(), GO2RoughRealCfgPPO())
 task_registry.register( "h1", H1Robot, H1RoughCfg(), H1RoughCfgPPO())
 task_registry.register( "h1_2", H1_2Robot, H1_2RoughCfg(), H1_2RoughCfgPPO())
 task_registry.register( "g1", G1Robot, G1RoughCfg(), G1RoughCfgPPO())

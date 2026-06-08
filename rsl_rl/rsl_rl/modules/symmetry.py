@@ -92,47 +92,48 @@ class Symmetry:
         if obs is not None:
             aug_obs = obs.clone()
             
-            # --- Proprioception & Commands (Indices 0-11) ---
-            aug_obs[:, 1] *= -1.0   # Base Lin Vel Y
-            aug_obs[:, 3] *= -1.0   # Base Ang Vel Roll (X)
-            aug_obs[:, 5] *= -1.0   # Base Ang Vel Yaw (Z)
-            aug_obs[:, 7] *= -1.0   # Projected Gravity Y
-            aug_obs[:, 10] *= -1.0  # Command Y
-            aug_obs[:, 11] *= -1.0  # Command Yaw
+            # --- SELEZIONE AUTOMATICA DEGLI INDICI IN BASE AL NUMERO DI OBS ---
+            if obs.shape[1] >= 48 and self.env.cfg.env.num_observations == 48:
+                # Configurazione classica (con linear velocity)
+                aug_obs[:, 1] *= -1.0   # Base Lin Vel Y
+                aug_obs[:, 3] *= -1.0   # Base Ang Vel Roll (X)
+                aug_obs[:, 5] *= -1.0   # Base Ang Vel Yaw (Z)
+                aug_obs[:, 7] *= -1.0   # Projected Gravity Y
+                aug_obs[:, 10] *= -1.0  # Command Y
+                aug_obs[:, 11] *= -1.0  # Command Yaw
+                
+                joint_starts = [12, 24, 36]
+                h_start = 48
+            else:
+                # Nuova configurazione a 45 obs (senza linear velocity per Sim2Real)
+                aug_obs[:, 0] *= -1.0   # Base Ang Vel Roll (X)
+                aug_obs[:, 2] *= -1.0   # Base Ang Vel Yaw (Z)
+                aug_obs[:, 4] *= -1.0   # Projected Gravity Y
+                aug_obs[:, 7] *= -1.0   # Command Y
+                aug_obs[:, 8] *= -1.0   # Command Yaw
+                
+                joint_starts = [9, 21, 33]
+                h_start = 45
 
-            # --- Joints & Previous Actions (Indices 12-47) ---
-            # 12:24 (DOF Pos), 24:36 (DOF Vel), 36:48 (Prev Actions)
-            for start_idx in [12, 24, 36]:
-                # Slice out the 12 joints, reorder them, and put them back
+            # --- Joints & Previous Actions ---
+            for start_idx in joint_starts:
                 leg_data = obs[:, start_idx : start_idx + 12]
                 mirrored_legs = leg_data[:, swap_joint_indices].clone()
-                
-                # Flip signs of the Hip/Abduction joints
                 mirrored_legs[:, negate_joints_indices] *= -1.0
                 aug_obs[:, start_idx : start_idx + 12] = mirrored_legs
 
-            # --- Height Scans (Indices 48 to end) ---
+            # --- Height Scans ---
             if self.env.cfg.terrain.measure_heights:
-                h_start = 48
                 num_rows = 17 # measured_points_x
                 num_cols = 11 # measured_points_y
                 
-                # Extract only the height portion
                 heights = obs[:, h_start : h_start + (num_rows * num_cols)]
-                
-                # Reshape to 2D grid [Batch, Rows, Cols]
                 heights_grid = heights.view(-1, num_rows, num_cols)
-                
-                # Flip the Y-axis (the columns)
-                # This moves "Left" terrain data to the "Right" side
                 flipped_heights = torch.flip(heights_grid, dims=[2]) 
-                
-                # Flatten back to vector and update augmented observation
                 aug_obs[:, h_start : h_start + (num_rows * num_cols)] = flipped_heights.reshape(obs.shape[0], -1)
 
         if actions is not None:
             aug_actions = actions.clone()
-            # Mirror the action output same as the DOF Pos
             aug_actions = aug_actions[:, swap_joint_indices]
             aug_actions[:, negate_joints_indices] *= -1.0
 
