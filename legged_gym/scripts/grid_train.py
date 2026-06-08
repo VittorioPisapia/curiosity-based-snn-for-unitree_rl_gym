@@ -23,16 +23,19 @@ def set_nested_attr(obj, attr, value):
     setattr(obj, parts[-1], value)
 
 search_space = {
-
-
+    "runner.seed":[0,1,2,3,4]
 }
 
 def train(args, params, log_root):
-    env, env_cfg = task_registry.make_env(name=args.task, args=args)
     _, train_cfg = task_registry.get_cfgs(args.task)
 
     for k, v in params.items():
         set_nested_attr(train_cfg, k, v)
+
+    if 'runner.seed' in params:
+        args.seed = train_cfg.runner.seed
+        
+    env, env_cfg = task_registry.make_env(name=args.task, args=args)
 
     ppo_runner, _ = task_registry.make_alg_runner(
         env=env, train_cfg=train_cfg, args=args, log_root=log_root
@@ -44,6 +47,7 @@ def train(args, params, log_root):
     )
 
     _, avg_reward = ppo_runner.alg.storage.get_statistics()
+
 
     env.gym.destroy_sim(env.sim)
     torch.cuda.empty_cache()
