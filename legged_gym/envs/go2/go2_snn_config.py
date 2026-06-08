@@ -9,7 +9,7 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
             snn_lens = 0.3 # 0.3 Gaussian width
             snn_st = 1  # 1
             neuron_type = "Gaussian" # Gaussian, BPTT
-            num_neurons = [384, 384] # 256, 384, 512
+            num_neurons = [512, 384] # 256, 384, 512
 
     class runner ( GO2RoughCfgPPO.runner ):
         policy_class_name = "ActorCriticSNN"
@@ -20,7 +20,7 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
 
         use_spike_loss = False
         spike_loss_coeff = 0.05
-        spike_rate_target = [0.10, 0.10]
+        spike_rate_target = [0.0]
 
         use_symmetry = True
         class symmetry:

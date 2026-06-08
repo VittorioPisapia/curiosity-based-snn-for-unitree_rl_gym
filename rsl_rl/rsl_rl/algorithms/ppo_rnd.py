@@ -218,12 +218,12 @@ class PPO_Rnd (PPO):
 
                     spike_loss = 0.0
 
-                    for l, s in enumerate(spike_rates):
+                    for s, target_rate in zip(spike_rates, self.target_rates):
                         rate = s.mean()
-                        spike_loss += (rate - self.target_rates[l]) ** 2
+                        spike_loss += (rate - target_rate) ** 2
 
-                    spike_loss /= len(spike_rates)
-                    
+                    spike_loss /= len(self.target_rates)
+
                     loss = loss + spike_loss * self.spike_loss_coeff
 
                 # Gradient step
