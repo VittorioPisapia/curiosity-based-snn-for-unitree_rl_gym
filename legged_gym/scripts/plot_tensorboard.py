@@ -19,6 +19,8 @@ def plot_tensorboard_csvs(
         smooth_window=50,
         save_path=None):
 
+    plt.rcParams.update({'font.size': 14}) 
+
     plt.figure(figsize=(10, 5))
 
     for label, csv_path in csv_files.items():
@@ -67,16 +69,7 @@ def main():
     csv_files = {
 
         "SNN":
-            r"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/plot_tensorboard/rough_go2_snn_baseline_snn.csv",
-
-        "RND":
-            r"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/plot_tensorboard/rough_go2_rnd_rnd_baseline_0.00015.csv",
-
-        "SNN SPIKE SYMM":
-            r"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/plot_tensorboard/rough_go2_snn_snn_spike_symm.csv",
-
-        "RND SPIKE SYMM":
-            r"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/plot_tensorboard/rough_go2_rnd_rnd_spike_symm.csv",
+            r"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/csv/rough_go2_snn_snn_spike_symm.csv",
     }
 
     plot_tensorboard_csvs(
