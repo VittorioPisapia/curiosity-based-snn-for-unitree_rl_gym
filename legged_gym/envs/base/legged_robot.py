@@ -1055,3 +1055,13 @@ class LeggedRobot(BaseTask):
         foot_velocities_xy = torch.norm(foot_velocities[:, :, :2], dim=2)
         contact = self.contact_forces[:, self.feet_indices, 2] > 1.0
         return torch.sum(contact * foot_velocities_xy, dim=1)
+
+    def _reward_feet_distance(self):
+        # Prendi le posizioni dei piedi sinistri e destri sull'asse Y
+        # Esempio ipotetico: calcola la distanza tra piede anteriore sinistro e destro
+        left_feet_y = self.feet_pos[:, [0, 2], 1]  # indici piedi SX, asse Y
+        right_feet_y = self.feet_pos[:, [1, 3], 1] # indici piedi DX, asse Y
+        
+        distance = torch.abs(left_feet_y - right_feet_y)
+        # Penalizza se la distanza è inferiore a una soglia (es. 15-20 centimetri)
+        return torch.sum(torch.clamp(0.2 - distance, min=0.0))

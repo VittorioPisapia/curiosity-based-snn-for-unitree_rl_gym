@@ -26,6 +26,7 @@ class GO2RoughRealCfg( GO2RoughCfg ):
             action_rate = -0.02
             slip = -0.01
             cost_of_transport = -0.1 # -0.05 ~ -0.2
+            reward_feet_distance = -1.0
 
 class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
 
@@ -59,5 +60,5 @@ class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
         use_symmetry = True
         class symmetry:
             use_data_augmentation = False
-            use_mirror_loss = False
-            mirror_loss_coeff = 0.5
+            use_mirror_loss = True
+            mirror_loss_coeff = 1
