@@ -139,7 +139,11 @@ class TaskRegistry():
         elif runner_class_name == 'SnnRunner_energy': 
             from rsl_rl.runners.snn_runner_energy import SnnRunner_energy 
             runner = SnnRunner_energy(env, train_cfg_dict, log_dir, device=args.rl_device)
-            
+        
+        elif runner_class_name == 'RealRunner': 
+            from rsl_rl.runners.real_runner import RealRunner 
+            runner = RealRunner(env, train_cfg_dict, log_dir, device=args.rl_device)
+
         else:
             raise ValueError(f"Unknown runner class: {runner_class_name}. Please check your config file!")
         

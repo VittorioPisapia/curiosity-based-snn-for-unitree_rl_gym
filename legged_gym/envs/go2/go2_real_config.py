@@ -30,7 +30,7 @@ class GO2RoughRealCfg( GO2RoughCfg ):
 
 class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
 
-    runner_class_name = "RndRunner"
+    runner_class_name = "RealRunner"
     class policy ( GO2RoughSNNCfgPPO.policy ):
         class snn:
             snn_threshold = 0.4 # 0.5
