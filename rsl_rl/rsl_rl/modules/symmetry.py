@@ -90,47 +90,56 @@ class Symmetry:
         aug_actions = None
 
         if obs is not None:
-            aug_obs = obs.clone()
+
+            if hasattr(self.env, 'num_obs_single'):
+                num_obs_single = self.env.num_obs_single
+            else:
+                num_obs_single = obs.shape[1]
             
-            if obs.shape[1] >= 48:
-                # Configurazione a 48 (vale sia per obs standard a 48, sia per privileged_obs a 48)
-                aug_obs[:, 1] *= -1.0   # Base Lin Vel Y
-                aug_obs[:, 3] *= -1.0   # Base Ang Vel Roll (X)
-                aug_obs[:, 5] *= -1.0   # Base Ang Vel Yaw (Z)
-                aug_obs[:, 7] *= -1.0   # Projected Gravity Y
-                aug_obs[:, 10] *= -1.0  # Command Y
-                aug_obs[:, 11] *= -1.0  # Command Yaw
-                
-                joint_starts = [12, 24, 36]
-                h_start = 48
+            num_hist_steps = obs.shape[1] // num_obs_single
+            
+            obs_history_split = obs.view(obs.shape[0], num_hist_steps, num_obs_single)
+            aug_obs_history = obs_history_split.clone()
 
-            elif obs.shape[1] >= 45:
-                # Configurazione a 45 obs (Actor input nel caso asimmetrico)
-                aug_obs[:, 0] *= -1.0   # Base Ang Vel Roll (X)
-                aug_obs[:, 2] *= -1.0   # Base Ang Vel Yaw (Z)
-                aug_obs[:, 4] *= -1.0   # Projected Gravity Y
-                aug_obs[:, 7] *= -1.0   # Command Y
-                aug_obs[:, 8] *= -1.0   # Command Yaw
-                
-                joint_starts = [9, 21, 33]
-                h_start = 45
+            for t in range(num_hist_steps):
+                single_obs = obs_history_split[:, t, :]
+                single_aug_obs = single_obs.clone()
 
-            # --- Joints & Previous Actions ---
-            for start_idx in joint_starts:
-                leg_data = obs[:, start_idx : start_idx + 12]
-                mirrored_legs = leg_data[:, swap_joint_indices].clone()
-                mirrored_legs[:, negate_joints_indices] *= -1.0
-                aug_obs[:, start_idx : start_idx + 12] = mirrored_legs
+                if num_obs_single >= 48:
+                    single_aug_obs[:, 1] *= -1.0   # Base Lin Vel Y
+                    single_aug_obs[:, 3] *= -1.0   # Base Ang Vel Roll (X)
+                    single_aug_obs[:, 5] *= -1.0   # Base Ang Vel Yaw (Z)
+                    single_aug_obs[:, 7] *= -1.0   # Projected Gravity Y
+                    single_aug_obs[:, 10] *= -1.0  # Command Y
+                    single_aug_obs[:, 11] *= -1.0  # Command Yaw
+                    joint_starts = [12, 24, 36]
+                    h_start = 48
+                elif num_obs_single >= 45:
+                    single_aug_obs[:, 0] *= -1.0   # Base Ang Vel Roll (X)
+                    single_aug_obs[:, 2] *= -1.0   # Base Ang Vel Yaw (Z)
+                    single_aug_obs[:, 4] *= -1.0   # Projected Gravity Y
+                    single_aug_obs[:, 7] *= -1.0   # Command Y
+                    single_aug_obs[:, 8] *= -1.0   # Command Yaw
+                    joint_starts = [9, 21, 33]
+                    h_start = 45
 
-            # --- Height Scans ---
-            if self.env.cfg.terrain.measure_heights:
-                num_rows = 17 # measured_points_x
-                num_cols = 11 # measured_points_y
-                
-                heights = obs[:, h_start : h_start + (num_rows * num_cols)]
-                heights_grid = heights.view(-1, num_rows, num_cols)
-                flipped_heights = torch.flip(heights_grid, dims=[2]) 
-                aug_obs[:, h_start : h_start + (num_rows * num_cols)] = flipped_heights.reshape(obs.shape[0], -1)
+                for start_idx in joint_starts:
+                    leg_data = single_obs[:, start_idx : start_idx + 12]
+                    mirrored_legs = leg_data[:, swap_joint_indices].clone()
+                    mirrored_legs[:, negate_joints_indices] *= -1.0
+                    single_aug_obs[:, start_idx : start_idx + 12] = mirrored_legs
+
+                if self.env.cfg.terrain.measure_heights and (num_obs_single > h_start):
+                    num_rows = 17 
+                    num_cols = 11 
+                    heights = single_obs[:, h_start : h_start + (num_rows * num_cols)]
+                    heights_grid = heights.view(-1, num_rows, num_cols)
+                    flipped_heights = torch.flip(heights_grid, dims=[2]) 
+                    single_aug_obs[:, h_start : h_start + (num_rows * num_cols)] = flipped_heights.reshape(obs.shape[0], -1)
+
+                aug_obs_history[:, t, :] = single_aug_obs
+
+            aug_obs = aug_obs_history.view(obs.shape[0], -1)
 
         if actions is not None:
             aug_actions = actions.clone()
@@ -139,7 +148,6 @@ class Symmetry:
 
         if obs is not None:
             aug_obs = torch.cat([obs, aug_obs], dim=0)
-
         if actions is not None:
             aug_actions = torch.cat([actions, aug_actions], dim=0)
 
