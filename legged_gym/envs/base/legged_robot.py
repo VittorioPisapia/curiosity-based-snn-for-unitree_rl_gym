@@ -1057,11 +1057,24 @@ class LeggedRobot(BaseTask):
         return torch.sum(contact * foot_velocities_xy, dim=1)
 
     def _reward_feet_distance(self):
-        # Prendi le posizioni dei piedi sinistri e destri sull'asse Y
-        # Esempio ipotetico: calcola la distanza tra piede anteriore sinistro e destro
-        left_feet_y = self.feet_pos[:, [0, 2], 1]  # indici piedi SX, asse Y
-        right_feet_y = self.feet_pos[:, [1, 3], 1] # indici piedi DX, asse Y
+        # self.rigid_body_states ha forma: [num_envs, num_bodies, 13]
+        # I primi 3 indici [:, :, 0:3] sono le posizioni X, Y, Z di ciascun body
+        # L'asse Y è l'indice 1
         
-        distance = torch.abs(left_feet_y - right_feet_y)
-        # Penalizza se la distanza è inferiore a una soglia (es. 15-20 centimetri)
-        return torch.sum(torch.clamp(0.2 - distance, min=0.0))
+        # Estraiamo la coordinata Y dei 4 piedi per tutti gli ambienti
+        # L'ordine standard dei piedi in Legged Gym è solitamente: [FL, FR, RL, RR]
+        # (FL=0: Anteriore SX, FR=1: Anteriore DX, RL=2: Posteriore SX, RR=3: Posteriore DX)
+        feet_y = self.rigid_body_states[:, self.feet_indices, 1]
+        
+        # Distanza Y tra i piedi anteriori (FL e FR)
+        front_dist = torch.abs(feet_y[:, 0] - feet_y[:, 1])
+        # Distanza Y tra i piedi posteriori (RL e RR)
+        rear_dist = torch.abs(feet_y[:, 2] - feet_y[:, 3])
+        
+        # Calcoliamo la penalità se le distanze scendono sotto i 20 cm (0.2 metri)
+        front_error = torch.clamp(0.2 - front_dist, min=0.)
+        rear_error = torch.clamp(0.2 - rear_dist, min=0.)
+        
+        # Sommiamo gli errori al quadrato (penalità quadratica)
+        # Usiamo torch.square per punire severamente solo quando sono vicini all'incrocio
+        return torch.square(front_error) + torch.square(rear_error)
