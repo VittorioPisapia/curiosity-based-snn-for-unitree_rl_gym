@@ -92,9 +92,8 @@ class Symmetry:
         if obs is not None:
             aug_obs = obs.clone()
             
-            # --- SELEZIONE AUTOMATICA DEGLI INDICI IN BASE AL NUMERO DI OBS ---
-            if obs.shape[1] >= 48 and self.env.cfg.env.num_observations == 48:
-                # Configurazione classica (con linear velocity)
+            if obs.shape[1] >= 48:
+                # Configurazione a 48 (vale sia per obs standard a 48, sia per privileged_obs a 48)
                 aug_obs[:, 1] *= -1.0   # Base Lin Vel Y
                 aug_obs[:, 3] *= -1.0   # Base Ang Vel Roll (X)
                 aug_obs[:, 5] *= -1.0   # Base Ang Vel Yaw (Z)
@@ -104,8 +103,9 @@ class Symmetry:
                 
                 joint_starts = [12, 24, 36]
                 h_start = 48
-            else:
-                # Nuova configurazione a 45 obs (senza linear velocity per Sim2Real)
+
+            elif obs.shape[1] >= 45:
+                # Configurazione a 45 obs (Actor input nel caso asimmetrico)
                 aug_obs[:, 0] *= -1.0   # Base Ang Vel Roll (X)
                 aug_obs[:, 2] *= -1.0   # Base Ang Vel Yaw (Z)
                 aug_obs[:, 4] *= -1.0   # Projected Gravity Y
