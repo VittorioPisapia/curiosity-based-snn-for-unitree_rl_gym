@@ -1,6 +1,7 @@
 import os
 import numpy as np
 import matplotlib.pyplot as plt
+from brokenaxes import brokenaxes
 
 import os
 import numpy as np
@@ -130,16 +131,17 @@ def compare_benchmarks(
     for agg, label, color in zip(aggregations, labels, colors):
 
         plt.errorbar(
-            agg["vel"][:-1],
-            agg["cot_mean"][:-1],
-            yerr=agg["cot_std"][:-1],
+            agg["vel"],
+            agg["cot_mean"],
+            yerr=agg["cot_std"],
             marker="o",
             capsize=4,
             linewidth=2,
             color=color,
             label=label
         )
-
+    #plt.yscale("log")
+    plt.ylim(bottom=0.28, top=.4)
     plt.xlabel("Velocity (m/s)")
     plt.ylabel("Cost of Transport (CoT)")
     plt.title("CoT Comparison")
@@ -164,9 +166,9 @@ def compare_benchmarks(
     for agg, label, color in zip(aggregations, labels, colors):
 
         plt.errorbar(
-            agg["vel"][:-1],
-            agg["rmse_mean"][:-1],
-            yerr=agg["rmse_std"][:-1],
+            agg["vel"],
+            agg["rmse_mean"],
+            yerr=agg["rmse_std"],
             marker="o",
             capsize=4,
             linewidth=2,
@@ -174,6 +176,7 @@ def compare_benchmarks(
             label=label
         )
 
+    plt.ylim(bottom=0.0, top=0.4)
     plt.xlabel("Velocity (m/s)")
     plt.ylabel("Velocity RMSE")
     plt.title("Tracking Error Comparison")
@@ -193,8 +196,8 @@ def compare_benchmarks(
     for agg, label, color in zip(aggregations, labels, colors):
 
         plt.plot(
-            agg["rmse_mean"][:-1],
-            agg["cot_mean"][:-1],
+            agg["rmse_mean"],
+            agg["cot_mean"],
             marker="o",
             linewidth=2,
             color=color,
@@ -206,10 +209,16 @@ def compare_benchmarks(
             plt.annotate(
                 f"{v:.2f}",
                 (agg["rmse_mean"][i], agg["cot_mean"][i]),
-                fontsize=8,
-                color=color
+                fontsize=12,
+                color="black",               # <--- Forza il testo in nero
+                textcoords="offset points",  # <--- Specifica che l'offset è in punti tipografici
+                xytext=(20, 8),               # <--- Sposta il testo di 0 punti a destra e 8 punti in alto
+                ha="center",                 # <--- Centra il testo orizzontalmente sopra il punto
+                va="bottom"                  # <--- Allinea il testo verticalmente
             )
-
+    
+    plt.ylim(bottom=0.3, top=0.4)
+    plt.xlim(0.0, 0.15)
     plt.xlabel("Velocity RMSE")
     plt.ylabel("Cost of Transport (CoT)")
     plt.title("Efficiency vs Tracking Tradeoff")
@@ -234,9 +243,9 @@ def main():
 
     benchmark_dirs = [
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/baseline_plane/benchmark",
+        #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/baseline_plane/benchmark",
 
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_snn/benchmark",
+        #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/baseline_snn/benchmark",
 
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00013/benchmark",
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_baseline_0.00015/benchmark",
@@ -247,19 +256,19 @@ def main():
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_0.00015/benchmark",
 
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_symm/benchmark",
-        "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm/benchmark",
+        #"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm/benchmark",
 
         # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2/baseline_rough/benchmark",
-        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/slopes_spike_symm/benchmark_small",
-        # "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_slopes_spike_symm/benchmark_small",
+         "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/slopes_spike_symm/benchmark_small",
+         "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_slopes_spike_symm/benchmark_small",
  
     ]
 
     labels = [
 
-        "PPO",
+        #"PPO",
 
-        "SNN",
+        #"SNN",
 
         # "RND (0.00013)",
         # "RND (0.00015)",
@@ -270,7 +279,7 @@ def main():
         #"RND SPIKE (0.10)",
 
         #"SNN SPIKE SYMM",
-        "RND SPIKE SYMM",
+        #"RND SPIKE SYMM",
 
         #"SLOPE PPO",
         "SNN SPIKE SYMM",
