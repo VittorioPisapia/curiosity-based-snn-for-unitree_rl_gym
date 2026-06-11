@@ -7,7 +7,7 @@ import torch
 
 from .snn_runner import SnnRunner
 from rsl_rl.modules.actor_critic import ActorCriticSNN
-from rsl_rl.algorithms.ppo_rnd import PPO_Rnd
+from rsl_rl.algorithms.ppo_real import PPO_Real
 from rsl_rl.env import VecEnv
 from torch.utils.tensorboard import SummaryWriter
 
@@ -40,7 +40,7 @@ class RealRunner ( SnnRunner ):
                                                         self.env.num_actions,
                                                         **self.policy_cfg).to(self.device)
         alg_class = eval(self.cfg["algorithm_class_name"]) # PPO
-        self.alg: PPO_Rnd = alg_class(env=self.env, actor_critic=actor_critic, device=self.device, **self.alg_cfg)
+        self.alg: PPO_Real = alg_class(env=self.env, actor_critic=actor_critic, device=self.device, **self.alg_cfg)
         self.num_steps_per_env = self.cfg["num_steps_per_env"]
         self.save_interval = self.cfg["save_interval"]
 
@@ -93,13 +93,15 @@ class RealRunner ( SnnRunner ):
                     obs, critic_obs, rewards, dones = obs.to(self.device), critic_obs.to(self.device), rewards.to(self.device), dones.to(self.device)
 
                     lin_vel_for_rnd = critic_obs[:, 0:3]
-                    obs_lin_vel    = obs[:, 0:3]
-                    obs_ang_vel    = obs[:, 3:6]
-                    obs_proj_grav  = obs[:, 6:9]
-                    obs_commands   = obs[:, 9:12]
-                    obs_dof_pos    = obs[:, 12:24]
-                    obs_dof_vel    = obs[:, 24:36]
-                    obs_last_act   = obs[:, 36:48] 
+
+                    obs_last       = obs[:, -45:]
+
+                    obs_ang_vel   = obs_last[:, 0:3]
+                    obs_proj_grav = obs_last[:, 3:6]
+                    obs_commands  = obs_last[:, 6:9]
+                    obs_dof_pos   = obs_last[:, 9:21]
+                    obs_dof_vel   = obs_last[:, 21:33]
+                    obs_last_act  = obs_last[:, 33:45]
 
                     obs_for_rnd = torch.cat((lin_vel_for_rnd, obs_dof_pos,obs_dof_vel), dim=-1)
                     #obs_for_rnd = torch.cat((obs[:, :9], obs[:, 12:-(12)]), dim=-1)  # No actions, no commands, no heights (add +187)
