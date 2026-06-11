@@ -6,7 +6,7 @@ class GO2RoughRealCfg( GO2RoughCfg ):
         num_envs = 8000
         num_observations = 45 # add 187 for height measurements
         num_privileged_obs = 48 # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
-        num_obs_hist = 1
+        num_obs_hist = 5
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
@@ -26,7 +26,7 @@ class GO2RoughRealCfg( GO2RoughCfg ):
             action_rate = -0.02
             slip = -0.01
             cost_of_transport = -0.1 # -0.05 ~ -0.2
-            feet_distance = -0.1
+            #feet_distance = -10
 
 class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
 
@@ -41,10 +41,10 @@ class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
 
     class runner ( GO2RoughSNNCfgPPO.runner ):
         experiment_name = "rough_go2_real"
-        algorithm_class_name = 'PPO_Rnd'
+        algorithm_class_name = 'PPO_Real'
 
     class algorithm ( GO2RoughSNNCfgPPO.algorithm ):
-        use_rnd = False
+        use_rnd = True
         class rnd:
             num_obs = 27 
             num_outputs = 4
