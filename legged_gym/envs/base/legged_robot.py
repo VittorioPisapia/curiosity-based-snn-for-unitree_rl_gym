@@ -518,8 +518,8 @@ class LeggedRobot(BaseTask):
         """
         # If the tracking reward is above 80% of the maximum, increase the range of commands
         if torch.mean(self.episode_sums["tracking_lin_vel"][env_ids]) / self.max_episode_length > 0.8 * self.reward_scales["tracking_lin_vel"]:
-            self.command_ranges["lin_vel_x"][0] = np.clip(self.command_ranges["lin_vel_x"][0] - 0.5, -self.cfg.commands.max_curriculum, 0.)
-            self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.5, 0., self.cfg.commands.max_curriculum)
+            self.command_ranges["lin_vel_x"][0] = np.clip(self.command_ranges["lin_vel_x"][0] - 0.05, -self.cfg.commands.max_curriculum, 0.)
+            self.command_ranges["lin_vel_x"][1] = np.clip(self.command_ranges["lin_vel_x"][1] + 0.05, 0., self.cfg.commands.max_curriculum)
 
     def _update_terrain_curriculum(self, env_ids):
         """ Implements the game-inspired curriculum.
@@ -1069,8 +1069,8 @@ class LeggedRobot(BaseTask):
         front_dist = torch.abs(feet_y[:, 0] - feet_y[:, 1])
         rear_dist = torch.abs(feet_y[:, 2] - feet_y[:, 3])
         
-        front_error = torch.clamp(0.2 - front_dist, min=0.)
-        rear_error = torch.clamp(0.2 - rear_dist, min=0.)
+        front_error = torch.clamp(0.1 - front_dist, min=0.)
+        rear_error = torch.clamp(0.1 - rear_dist, min=0.)
     
         return torch.square(front_error) + torch.square(rear_error)
 

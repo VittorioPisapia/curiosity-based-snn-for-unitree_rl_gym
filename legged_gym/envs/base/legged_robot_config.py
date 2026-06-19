@@ -39,7 +39,7 @@ class LeggedRobotCfg(BaseConfig):
 
     class commands:
         curriculum = False
-        max_curriculum = 1.
+        max_curriculum = 0
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
@@ -126,6 +126,7 @@ class LeggedRobotCfg(BaseConfig):
             action_rate = -0.01
             stand_still = -0.
             feet_distance = 0.0
+            foot_clearance = 0.0
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25 # tracking reward = exp(-error^2/sigma)
