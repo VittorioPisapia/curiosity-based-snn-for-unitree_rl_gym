@@ -77,7 +77,6 @@ def train(args, params, log_root):
 
     return ppo_runner.log_dir, avg_reward.item()
 
-# --- NUOVA FUNZIONE WRAPPER PER MULTIPROCESSING ---
 def train_worker(args, params, log_root, return_dict):
     try:
         log_dir, avg_reward = train(args, params, log_root)
@@ -90,7 +89,6 @@ def train_worker(args, params, log_root, return_dict):
 # --------------------------------------------------
 
 if __name__ == '__main__':
-    # CRITICO PER ISAAC GYM: imposta il metodo 'spawn' per evitare di condividere contesti CUDA errati
     mp.set_start_method('spawn', force=True) 
 
     args = get_args()
@@ -114,7 +112,6 @@ if __name__ == '__main__':
     combos = list(product(*values))
     total = len(combos)
 
-    # Manager per permettere al worker di comunicare con il processo principale
     manager = mp.Manager()
 
     for i, combo in enumerate(combos, 1):
@@ -132,15 +129,13 @@ if __name__ == '__main__':
 
         print(f"[{i}/{total}] Running with: {params}")
 
-        # Creiamo un dizionario condiviso per raccogliere i risultati dal processo figlio
         return_dict = manager.dict()
-        
-        # Inizializziamo ed eseguiamo il processo
+
         p = mp.Process(target=train_worker, args=(args, params, grid_log_root, return_dict))
         p.start()
-        p.join() # Attendiamo che il processo termini (grid search sequenziale)
+        p.join() 
 
-        # Gestione dell'output
+
         if return_dict.get('status') == 'success':
             results[key] = {
                 "log_dir": return_dict['log_dir'],
@@ -152,9 +147,7 @@ if __name__ == '__main__':
             results[key] = {
                 "error": error_msg
             }
-            
-            # Nota: i classici segfault C++ faranno fallire il processo senza passare dall'eccezione Python, 
-            # p.join() terminerà e 'status' non sarà 'success'.
+
             if p.exitcode != 0 and 'status' not in return_dict:
                 print("Segfault o crash a basso livello rilevato nel processo figlio. Procedo col prossimo seed.")
                 results[key]["error"] = f"Process terminated with exit code {p.exitcode}"

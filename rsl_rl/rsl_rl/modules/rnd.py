@@ -38,11 +38,10 @@ class RandomNetworkDistillation(nn.Module):
 
         for m in self.target.modules():
             if isinstance(m, nn.Linear):
-                nn.init.orthogonal_(m.weight, gain=1.414) # sqrt(2) gain
+                nn.init.orthogonal_(m.weight, gain=1.414) 
                 if m.bias is not None:
                     nn.init.zeros_(m.bias)
-                    
-        # Optional: Initialize the predictor cleanly as well
+
         for m in self.predictor.modules():
             if isinstance(m, nn.Linear):
                 nn.init.orthogonal_(m.weight, gain=1.0)

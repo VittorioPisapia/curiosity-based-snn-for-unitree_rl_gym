@@ -69,7 +69,7 @@ def main():
     csv_files = {
 
         "SNN":
-            r"/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/csv/rough_go2_snn_snn_spike_symm.csv",
+            r"",
     }
 
     plot_tensorboard_csvs(
