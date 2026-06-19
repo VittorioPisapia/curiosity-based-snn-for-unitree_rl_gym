@@ -15,18 +15,20 @@ class GO2RoughRealCfg( GO2RoughCfg ):
   
     class rewards( GO2RoughCfg.rewards ):
         soft_dof_pos_limit = 0.9
-        base_height_target = 0.3
+        base_height_target = 0.27
         class scales( GO2RoughCfg.rewards.scales ):
             torques = -0.0002
             dof_pos_limits = -10.0
 
             # New
             base_height = -10
-            feet_air_time = 0.01
+            feet_air_time = 1
             action_rate = -0.02
             slip = -0.01
             cost_of_transport = -0.1 # -0.05 ~ -0.2
-            #feet_distance = -10
+            feet_distance = -0.5
+            foot_clearance = -0.5
+            stand_still = -0.5
 
 class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
 

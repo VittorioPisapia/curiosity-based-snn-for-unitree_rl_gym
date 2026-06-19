@@ -3,9 +3,9 @@ from .base_config import BaseConfig
 class LeggedRobotCfg(BaseConfig):
     class env:
         num_envs = 8000
-        num_observations = 48 # add 187 for height measurements
-        num_privileged_obs = None # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
-        num_obs_hist = 1
+        num_observations = 45 # add 187 for height measurements
+        num_privileged_obs = 48 # if not None a priviledge_obs_buf will be returned by step() (critic obs for assymetric training). None is returned otherwise 
+        num_obs_hist = 5
         num_actions = 12
         env_spacing = 3.  # not used with heightfields/trimeshes 
         send_timeouts = True # send time out information to the algorithm
@@ -39,7 +39,7 @@ class LeggedRobotCfg(BaseConfig):
 
     class commands:
         curriculum = False
-        max_curriculum = 1.
+        max_curriculum = 0
         num_commands = 4 # default: lin_vel_x, lin_vel_y, ang_vel_yaw, heading (in heading mode ang_vel_yaw is recomputed from heading error)
         resampling_time = 10. # time before command are changed[s]
         heading_command = True # if true: compute ang vel command from heading error
@@ -126,6 +126,7 @@ class LeggedRobotCfg(BaseConfig):
             action_rate = -0.01
             stand_still = -0.
             feet_distance = 0.0
+            foot_clearance = 0.0
 
         only_positive_rewards = True # if true negative total rewards are clipped at zero (avoids early termination problems)
         tracking_sigma = 0.25 # tracking reward = exp(-error^2/sigma)
@@ -182,7 +183,7 @@ class LeggedRobotCfg(BaseConfig):
             contact_collection = 2 # 0: never, 1: last sub-step, 2: all sub-steps (default=2)
 
 class LeggedRobotCfgPPO(BaseConfig):
-    seed = 67
+    seed = 1
     runner_class_name = 'OnPolicyRunner'
     class policy:
         init_noise_std = 1.0
