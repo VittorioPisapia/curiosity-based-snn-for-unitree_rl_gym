@@ -121,7 +121,13 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
 
 def configure_commands(env_cfg, mode):
     if mode == "straight":
-        env_cfg.commands.ranges.lin_vel_x = [1.0, 1.0]
+        env_cfg.commands.ranges.lin_vel_x = [1, 1]
+        env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
+        env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
+        env_cfg.commands.ranges.heading = [0.0, 0.0]
+    
+    elif mode == "still":
+        env_cfg.commands.ranges.lin_vel_x = [0.0, 0.0]
         env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
         env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
         env_cfg.commands.ranges.heading = [0.0, 0.0]

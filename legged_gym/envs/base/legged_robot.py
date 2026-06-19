@@ -412,6 +412,12 @@ class LeggedRobot(BaseTask):
         # set small commands to zero
         self.commands[env_ids, :2] *= (torch.norm(self.commands[env_ids, :2], dim=1) > 0.2).unsqueeze(1)
 
+        stop_mask = torch.rand(len(env_ids), device=self.device) < 0.05
+
+        self.commands[env_ids[stop_mask], 0] = 0.0
+        self.commands[env_ids[stop_mask], 1] = 0.0
+        self.commands[env_ids[stop_mask], 2] = 0.0
+
     def _compute_torques(self, actions):
         """ Compute torques from actions.
             Actions can be interpreted as position or velocity targets given to a PD controller, or directly as scaled torques.
@@ -1067,3 +1073,20 @@ class LeggedRobot(BaseTask):
         rear_error = torch.clamp(0.2 - rear_dist, min=0.)
     
         return torch.square(front_error) + torch.square(rear_error)
+
+    def _reward_foot_clearance(self):
+
+        contact = self.contact_forces[:, self.feet_indices, 2] > 1.
+
+        foot_height = self.rigid_body_states[:, self.feet_indices, 2]
+
+        target_height = 0.1
+
+        clearance_error = torch.square(
+            foot_height - target_height
+        )
+
+        return torch.sum(
+            (~contact) * clearance_error,
+            dim=1
+        )
