@@ -5,6 +5,7 @@ import isaacgym
 from isaacgym import gymapi, gymtorch
 import torch
 import numpy as np
+import pygame
 
 from legged_gym.envs import *
 from legged_gym.utils import get_args, task_registry
@@ -66,6 +67,8 @@ def play(args):
     env_cfg.domain_rand.push_robots = False
     env_cfg.commands.heading_command = False
     env_cfg.env.episode_length_s = 1000000
+    env_cfg.domain_rand.push_interval_s=5
+    env_cfg.domain_rand.max_push_vel_xy=1000
     env, _ = task_registry.make_env(
         name=args.task,
         args=args,
@@ -73,8 +76,8 @@ def play(args):
     )
 
     env.set_camera(
-        [1.041, -3.016, 1.260],
-        [1.075, -2.043, 1.031]
+        [-1.213, -2.786, 0.916],
+        [-1.179, -1.813, 0.687]
     )
     
     obs = env.get_observations()
@@ -92,6 +95,19 @@ def play(args):
         device=env.device
     )
 
+    pygame.init()
+    pygame.joystick.init()
+
+    joystick = None
+
+    if pygame.joystick.get_count() > 0:
+        joystick = pygame.joystick.Joystick(0)
+        joystick.init()
+
+        print(f"Controller connected: {joystick.get_name()}")
+    else:
+        print("No controller detected.")
+
     ########################################################
     # TELEOP COMMANDS
     ########################################################
@@ -99,6 +115,10 @@ def play(args):
     vx = 0.0
     vy = 0.0
     yaw = 0.0
+
+    max_vx = 0.5
+    max_vy = 0.5
+    max_yaw = 1.0
 
     gym = env.gym
     viewer = env.viewer
@@ -159,14 +179,18 @@ def play(args):
 
     print()
     print("========== TELEOP ==========")
-    print("W      : vx += 0.1")
-    print("S      : vx -= 0.1")
-    print("A      : vy += 0.1")
-    print("D      : vy -= 0.1")
-    print("Q      : yaw += 0.1")
-    print("E      : yaw -= 0.1")
-    print("SPACE  : zero commands")
-    print("R      : reset robot")
+    print("KEYBOARD")
+    print("  W/S : vx +/-")
+    print("  A/D : vy +/-")
+    print("  Q/E : yaw +/-")
+    print("  SPACE : stop")
+    print("  R : reset")
+    print()
+    print("XBOX")
+    print("  Left stick  : vx / vy")
+    print("  Right stick : yaw")
+    print("  A : reset")
+    print("  B : stop")
     print("============================")
     print()
 
@@ -182,11 +206,11 @@ def play(args):
                 continue
 
             if evt.action == "vx_plus":
-                vx += 0.1
+                vx += 0.5
                 print(f"vx = {vx:.2f}")
 
             elif evt.action == "vx_minus":
-                vx -= 0.1
+                vx -= 0.5
                 print(f"vx = {vx:.2f}")
 
             if evt.action == "vy_plus":
@@ -231,7 +255,57 @@ def play(args):
                 )
 
                 print("==================\n")
+        ####################################################
+        # GAMEPAD
+        ####################################################
 
+        if joystick is not None:
+
+            pygame.event.pump()
+
+            left_x = joystick.get_axis(0)
+            left_y = joystick.get_axis(1)
+
+            try:
+                right_x = joystick.get_axis(3)
+            except:
+                right_x = 0.0
+
+            deadzone = 0.10
+
+            if abs(left_x) < deadzone:
+                left_x = 0.0
+
+            if abs(left_y) < deadzone:
+                left_y = 0.0
+
+            if abs(right_x) < deadzone:
+                right_x = 0.0
+
+            vx = -left_y * max_vx
+            vy = left_x * max_vy
+            yaw = right_x * max_yaw
+
+            ################################################
+            # Buttons
+            ################################################
+
+            if joystick.get_button(0):  # A
+                env.reset_idx(
+                    torch.tensor([0], device=env.device)
+                )
+                print("robot reset")
+
+            if joystick.get_button(1):  # B
+                vx = 0.0
+                vy = 0.0
+                yaw = 0.0
+
+            if joystick.get_button(4):  # LB
+                max_vx = max(0.2, max_vx - 0.01)
+
+            if joystick.get_button(5):  # RB
+                max_vx = min(3.0, max_vx + 0.01)
         ####################################################
         # APPLY COMMANDS
         ####################################################
