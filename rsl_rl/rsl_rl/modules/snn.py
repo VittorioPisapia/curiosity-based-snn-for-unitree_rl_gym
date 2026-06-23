@@ -271,12 +271,15 @@ class SNN(nn.Module):
 
                 z = layer(x)
 
+                is_last_layer = (layer_idx == self.num_layers - 1)
+                should_spike = not is_last_layer
+
                 h = self._neurons_forward(
                     z,
                     current_state,
                     start_idx,
                     end_idx,
-                    True
+                    output_spikes=should_spike
                 )
 
                 x = h["snn_s"]

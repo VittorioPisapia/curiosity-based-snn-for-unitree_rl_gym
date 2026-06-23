@@ -24,11 +24,13 @@ class GO2RoughRealCfg( GO2RoughCfg ):
             base_height = -10
             feet_air_time = 1
             action_rate = -0.02
-            slip = -0.01
+            slip = 0
             cost_of_transport = -0.1 # -0.05 ~ -0.2
-            feet_distance = -0.5
-            foot_clearance = -0.5
-            stand_still = -0.5
+            feet_distance = -15
+            foot_clearance = -15
+            stand_still = -10
+            #standing_contacts = 5
+            still_base_motion = -2.0
 
 class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
 
@@ -55,7 +57,7 @@ class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
             learning_rate = 1.e-4
             weight = 0.00015
 
-        use_spike_loss = False
+        use_spike_loss = True
         spike_loss_coeff = 0.05
         spike_rate_target = [0.10]
 
@@ -63,4 +65,4 @@ class GO2RoughRealCfgPPO( GO2RoughSNNCfgPPO):
         class symmetry:
             use_data_augmentation = False
             use_mirror_loss = True
-            mirror_loss_coeff = 1
+            mirror_loss_coeff = 0.7

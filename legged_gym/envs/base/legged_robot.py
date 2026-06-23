@@ -1069,8 +1069,8 @@ class LeggedRobot(BaseTask):
         front_dist = torch.abs(feet_y[:, 0] - feet_y[:, 1])
         rear_dist = torch.abs(feet_y[:, 2] - feet_y[:, 3])
         
-        front_error = torch.clamp(0.1 - front_dist, min=0.)
-        rear_error = torch.clamp(0.1 - rear_dist, min=0.)
+        front_error = torch.clamp(0.18 - front_dist, min=0.)
+        rear_error = torch.clamp(0.18 - rear_dist, min=0.)
     
         return torch.square(front_error) + torch.square(rear_error)
 
@@ -1080,7 +1080,7 @@ class LeggedRobot(BaseTask):
 
         foot_height = self.rigid_body_states[:, self.feet_indices, 2]
 
-        target_height = 0.1
+        target_height = 0.12
 
         clearance_error = torch.square(
             foot_height - target_height
@@ -1090,3 +1090,27 @@ class LeggedRobot(BaseTask):
             (~contact) * clearance_error,
             dim=1
         )
+
+    def _reward_standing_contacts(self):
+
+        command_zero = torch.norm(self.commands[:, :2], dim=1) < 0.1
+
+        contacts = (
+            self.contact_forces[:, self.feet_indices, 2] > 1.
+        ).float()
+
+        return (
+            torch.sum(contacts, dim=1)
+            / 4.0
+        ) * command_zero
+
+    def _reward_still_base_motion(self):
+
+        command_zero = torch.norm(self.commands[:, :3], dim=1) < 0.1
+
+        motion = (
+            torch.sum(torch.square(self.base_lin_vel[:, :2]), dim=1)
+            + torch.square(self.base_ang_vel[:, 2])
+        )
+
+        return motion * command_zero
