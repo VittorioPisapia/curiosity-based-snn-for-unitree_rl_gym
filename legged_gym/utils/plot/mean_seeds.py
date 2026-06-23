@@ -72,28 +72,17 @@ def compare_metric(
     plt.tight_layout()
 
 
-# ==========================
-# PATHS
-# ==========================
+
 
 snn_paths = [
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_symm/benchmark/aggregated.npy",
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_symm_10/benchmark/aggregated.npy",
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_symm_67/benchmark/aggregated.npy",
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_snn/snn_spike_symm_1000/benchmark/aggregated.npy",
+
 ]
 
 rnd_paths = [
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm/benchmark/aggregated.npy",
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm_10/benchmark/aggregated.npy",
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm_67/benchmark/aggregated.npy",
-    "/home/vittorio/Desktop/curiosity-based-snn-for-unitree_rl_gym/logs/rough_go2_rnd/rnd_spike_symm_1000/benchmark/aggregated.npy"
+
 ]
 
 
-# ==========================
-# LOAD
-# ==========================
 
 vel_snn, snn = load_config(snn_paths)
 vel_rnd, rnd = load_config(rnd_paths)
@@ -103,9 +92,6 @@ assert np.allclose(vel_snn, vel_rnd)
 vel = vel_snn
 
 
-# ==========================
-# PLOTS
-# ==========================
 
 compare_metric(
     vel,
