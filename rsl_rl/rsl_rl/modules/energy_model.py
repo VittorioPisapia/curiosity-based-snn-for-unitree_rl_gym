@@ -39,7 +39,6 @@ class EnergyForwardModel(nn.Module):
         ).to(device)
 
         # ---- Energy head: (φ(s), a) → Cot ----
-        # MODIFICATO: Adesso accetta la concatenazione di stato latente + azione
         self.energy_head = nn.Sequential(
             nn.Linear(latent_dim + action_dim, 128), 
             get_activation(activation),
@@ -55,7 +54,6 @@ class EnergyForwardModel(nn.Module):
         return self.forward_model(x)
 
     # ---- Energy prediction -----
-    # MODIFICATO: Accetta anche le azioni e le concatena allo stato latente
     def predict_energy(self, obs, actions):
         z = self.encode(obs)
         x = torch.cat([z, actions], dim=-1)
@@ -71,7 +69,6 @@ class EnergyForwardModel(nn.Module):
         forward_loss = torch.mean((z_pred_next - z_next) ** 2)
 
         # energy loss
-        # MODIFICATO: Usa la nuova funzione passando anche le azioni reali del buffer
         energy_pred = self.predict_energy(obs, actions)
         energy_loss = torch.mean((energy_pred - energy_target) ** 2)
 
