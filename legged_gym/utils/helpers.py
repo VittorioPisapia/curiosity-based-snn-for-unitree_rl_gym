@@ -119,9 +119,9 @@ def update_cfg_from_args(env_cfg, cfg_train, args):
 
     return env_cfg, cfg_train
 
-def configure_commands(env_cfg, mode):
+def configure_commands(env_cfg, mode, v):
     if mode == "straight":
-        env_cfg.commands.ranges.lin_vel_x = [1, 1]
+        env_cfg.commands.ranges.lin_vel_x = [v, v]
         env_cfg.commands.ranges.lin_vel_y = [0.0, 0.0]
         env_cfg.commands.ranges.ang_vel_yaw = [0.0, 0.0]
         env_cfg.commands.ranges.heading = [0.0, 0.0]
@@ -162,6 +162,7 @@ def get_args():
         {"name": "--checkpoint", "type": int,  "help": "Saved model checkpoint number. If -1: will load the last checkpoint. Overrides config file if provided."},
         
         {"name": "--cmd_type", "type": str, "default": "normal", "help": "Choose between velocity only on x direction or random."},
+        {"name": "--v", "type": float, "default": 1, "help": "Choose X velocity if straight."},
         {"name": "--push", "action": "store_true", "default": False, "help": "Push the robot during play"},
         {"name": "--headless", "action": "store_true", "default": False, "help": "Force display off at all times"},
         {"name": "--record", "action": "store_true", "default": False, "help": "Record frames during evaluation and save as video"},

@@ -32,6 +32,7 @@ def play(args):
         env_cfg.env.num_envs = min(env_cfg.env.num_envs, 100)
     
     command_mode = args.cmd_type
+    velocity = args.v
     timestamp = datetime.now().strftime('%b%d_%H-%M-%S')
 
     robot_idx = 0 
@@ -47,7 +48,7 @@ def play(args):
     env_cfg.domain_rand.push_interval_s=5
     env_cfg.domain_rand.max_push_vel_xy=1
 
-    configure_commands(env_cfg, command_mode)
+    configure_commands(env_cfg, command_mode, velocity)
 
     env_cfg.env.test = True
 
