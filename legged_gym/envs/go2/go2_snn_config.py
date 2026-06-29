@@ -20,12 +20,12 @@ class GO2RoughSNNCfgPPO( GO2RoughCfgPPO):
 
         use_spike_loss = True
         spike_loss_coeff = 0.1
-        spike_rate_target = [0.1]
+        spike_rate_target = [0.]
 
         use_symmetry = True
         class symmetry:
             use_data_augmentation = False
-            use_mirror_loss = False
+            use_mirror_loss = True
             mirror_loss_coeff = 0.5
 
 

@@ -19,8 +19,8 @@ class GO2RoughRNDCfgPPO( GO2RoughSNNCfgPPO):
             weight = 0.00015
 
         use_spike_loss = True
-        spike_loss_coeff = 0.05
-        spike_rate_target = [0.10]
+        spike_loss_coeff = 0.1
+        spike_rate_target = [0]
 
         use_symmetry = True
         class symmetry:
