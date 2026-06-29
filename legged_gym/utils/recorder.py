@@ -15,7 +15,7 @@ class VideoRecorder:
         fps=50,
         camera_offset=(1.0, 1.0, 0.5),
     ):
-
+        self.fps = fps
         self.env = env
         self.video_path = video_path
         self.camera_offset = camera_offset
@@ -29,8 +29,8 @@ class VideoRecorder:
             self.camera_props
         )
 
-        camera_position = gymapi.Vec3(4.0, 4.0, 3.0)
-        camera_target = gymapi.Vec3(0.0, 0.0, 0.5)
+        camera_position = gymapi.Vec3(2.323, -3.213, 0.822)
+        camera_target = gymapi.Vec3(2.357, -2.240, 0.593)
 
         self.env.gym.set_camera_location(
             self.camera_handle,
@@ -46,34 +46,34 @@ class VideoRecorder:
 
     def capture_frame(self):
 
-        robot_pos = self.env.root_states[0, :3].cpu().numpy()
+        # robot_pos = self.env.root_states[0, :3].cpu().numpy()
 
-        env_origin = self.env.gym.get_env_origin(self.env.envs[0])
+        # env_origin = self.env.gym.get_env_origin(self.env.envs[0])
 
-        local_x = robot_pos[0] - env_origin.x
-        local_y = robot_pos[1] - env_origin.y
-        local_z = robot_pos[2] - env_origin.z
+        # local_x = robot_pos[0] - env_origin.x
+        # local_y = robot_pos[1] - env_origin.y
+        # local_z = robot_pos[2] - env_origin.z
 
-        dx, dy, dz = self.camera_offset
+        # dx, dy, dz = self.camera_offset
 
-        cam_pos = gymapi.Vec3(
-            local_x + dx,
-            local_y + dy,
-            local_z + dz
-        )
+        # cam_pos = gymapi.Vec3(
+        #     local_x + dx,
+        #     local_y + dy,
+        #     local_z + dz
+        # )
 
-        cam_target = gymapi.Vec3(
-            local_x,
-            local_y,
-            local_z
-        )
+        # cam_target = gymapi.Vec3(
+        #     local_x,
+        #     local_y,
+        #     local_z
+        # )
 
-        self.env.gym.set_camera_location(
-            self.camera_handle,
-            self.env.envs[0],
-            cam_pos,
-            cam_target
-        )
+        # self.env.gym.set_camera_location(
+        #     self.camera_handle,
+        #     self.env.envs[0],
+        #     cam_pos,
+        #     cam_target
+        # )
 
         self.env.gym.fetch_results(self.env.sim, True)
 

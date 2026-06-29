@@ -9,6 +9,10 @@ import pygame
 
 from legged_gym.envs import *
 from legged_gym.utils import get_args, task_registry
+from legged_gym.utils.play_logger import RobotLogger
+from legged_gym.utils.plotting import plot_run, show_plot
+from legged_gym.utils.recorder import VideoRecorder
+
 def camera_target_from_transform(cam, distance=1.0):
 
     qx = cam.r.x
@@ -123,6 +127,11 @@ def play(args):
     gym = env.gym
     viewer = env.viewer
 
+    recording = False
+
+    logger = None
+    recorder = None
+
     gym.subscribe_viewer_keyboard_event(
         viewer,
         gymapi.KEY_W,
@@ -175,6 +184,12 @@ def play(args):
         viewer,
         gymapi.KEY_C,
         "print_camera"
+    )
+
+    gym.subscribe_viewer_keyboard_event(
+        viewer,
+        gymapi.KEY_L,
+        "toggle_recording"
     )
 
     print()
@@ -255,6 +270,43 @@ def play(args):
                 )
 
                 print("==================\n")
+
+            elif evt.action == "toggle_recording":
+
+                if not recording:
+
+                    logger = RobotLogger()
+
+                    recorder = VideoRecorder(
+                        env=env,
+                        video_path="run.mp4",
+                        fps=round(1.0 / env.dt)
+                    )
+
+                    recording = True
+
+                    print("Recording started.")
+
+                else:
+
+                    recording = False
+
+                    recorder.close()
+
+                    plot_run(
+                        logger,
+                        env,
+                        env_cfg
+                    )
+
+                    show_plot()
+
+                    sim_time = logger.num_steps * env.dt
+                    video_time = logger.num_steps / recorder.fps
+
+                    print(f"Simulation time : {sim_time:.2f}s")
+                    print(f"Video duration  : {video_time:.2f}s")
+
         ####################################################
         # GAMEPAD
         ####################################################
@@ -323,8 +375,23 @@ def play(args):
         obs, _, _, _, _ = env.step(
             actions.detach()
         )
+        if recording:
 
+            logger.log_step(env)
 
+            recorder.capture_frame()
+
+    if recording:
+
+        recorder.close()
+
+        plot_run(
+            logger,
+            env,
+            env_cfg
+        )
+
+        show_plot()
 if __name__ == "__main__":
 
     args = get_args()
